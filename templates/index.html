@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sorek Game Hub</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        :root { --bg: #0d1117; --side: #000000; --panel: #161b22; --accent: #58a6ff; --red: #f85149; }
+        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* PC STYLE */
+        .is-desktop #sidebar { width: 280px; background: var(--side); border-right: 1px solid #30363d; display: flex; flex-direction: column; padding: 20px; }
+        .is-desktop #main { flex: 1; overflow-y: auto; padding: 30px; display: flex; flex-direction: column; align-items: center; }
+        .is-desktop #nav-mobile { display: none; }
+        .is-desktop #chat { position: fixed; bottom: 20px; right: 20px; width: 320px; height: 400px; background: #010409; border: 1px solid #30363d; border-radius: 12px; display: flex; flex-direction: column; }
+
+        /* MOBILE STYLE */
+        .is-mobile { flex-direction: column; }
+        .is-mobile #sidebar { width: 100%; padding: 10px; border-bottom: 1px solid #30363d; background: var(--side); box-sizing: border-box; }
+        .is-mobile #main { flex: 1; padding: 15px; padding-bottom: 90px; overflow-y: auto; width: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; }
+        .is-mobile #nav-mobile { position: fixed; bottom: 0; width: 100%; height: 70px; background: #010409; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #30363d; z-index: 100; }
+        .is-mobile .desktop-only { display: none; }
+        .is-mobile #chat { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); z-index: 1000; flex-direction: column; }
+
+        /* COMMUNS */
+        .user-card { background: var(--panel); padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box; }
+        .view { display: none; width: 100%; flex-direction: column; align-items: center; }
+        .view.active { display: flex; }
+        .avatar { width: 40px; height: 40px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        
+        /* JEUX */
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; max-width: 320px; margin-top: 20px; }
+        .cell { aspect-ratio: 1/1; background: var(--panel); border: 1px solid #30363d; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 40px; cursor: pointer; }
+        canvas { background: white; border-radius: 10px; width: 100%; max-width: 600px; height: 400px; touch-action: none; border: 4px solid var(--panel); }
+        .shifumi-btn { font-size: 40px; padding: 20px; border-radius: 20px; background: var(--panel); border: 2px solid #30363d; }
+
+        /* MODAL DEFIS */
+        #modal { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--panel); padding:25px; border: 2px solid var(--accent); z-index:2000; border-radius:15px; text-align:center; width: 80%; max-width: 300px; }
+        
+        button { cursor: pointer; border: none; border-radius: 8px; font-weight: bold; padding: 10px 15px; }
+        .btn-blue { background: var(--accent); color: white; }
+        .btn-red { background: var(--red); color: white; }
+    </style>
+</head>
+<body>
+
+    <div id="modal">
+        <h3 id="m-title">⚔️ DÉFI !</h3>
+        <p id="m-body"></p>
+        <button class="btn-blue" onclick="acceptD()">ACCEPTER</button>
+        <button class="btn-red" onclick="closeM()">REFUSER</button>
+    </div>
+
+    <div id="sidebar">
+        <div style="display:flex; align-items:center; gap:10px;">
+            <div class="avatar" id="my-avatar">?</div>
+            <div>
+                <div id="my-pseudo" style="font-weight:bold; color:var(--accent)">...</div>
+                <div style="font-size:10px; color:gray;">Connecté</div>
+            </div>
+        </div>
+        <div class="desktop-only">
+            <h4 style="color:gray; margin: 20px 0 10px 0;">JOUEURS</h4>
+            <div id="u-list-desktop"></div>
+            <hr style="border:0; border-top:1px solid #30363d; margin:15px 0;">
+            <button class="btn-blue" style="width:100%; margin-bottom:5px;" onclick="nav('Accueil')">🏠 Accueil</button>
+            <button class="btn-blue" style="width:100%;" onclick="nav('Paint')">🎨 Paint Collectif</button>
+        </div>
+    </div>
+
+    <div id="main">
+        <div id="view-Accueil" class="view active">
+            <h1>Sorek Game Hub</h1>
+            <div id="u-list-mobile" style="width:100%;"></div>
+        </div>
+
+        <div id="view-Morpion" class="view">
+            <h2 id="m-status">Ton tour</h2>
+            <div class="grid" id="m-grid">
+                <div class="cell" onclick="playTic(0)"></div><div class="cell" onclick="playTic(1)"></div><div class="cell" onclick="playTic(2)"></div>
+                <div class="cell" onclick="playTic(3)"></div><div class="cell" onclick="playTic(4)"></div><div class="cell" onclick="playTic(5)"></div>
+                <div class="cell" onclick="playTic(6)"></div><div class="cell" onclick="playTic(7)"></div><div class="cell" onclick="playTic(8)"></div>
+            </div>
+            <button class="btn-red" style="margin-top:20px" onclick="socket.emit('quitter_duel',{room:curR})">Quitter</button>
+        </div>
+
+        <div id="view-Shifumi" class="view">
+            <h2>👊 Shifumi</h2>
+            <div style="display:flex; gap:10px; margin:20px 0;">
+                <button class="shifumi-btn" onclick="playS('Pierre')">🪨</button>
+                <button class="shifumi-btn" onclick="playS('Feuille')">📄</button>
+                <button class="shifumi-btn" onclick="playS('Ciseaux')">✂️</button>
+            </div>
+            <p id="s-status">Choisis un signe !</p>
+        </div>
+
+        <div id="view-Paint" class="view">
+            <h2>🎨 Paint Collectif</h2>
+            <canvas id="canvas" width="600" height="400"></canvas>
+            <button class="btn-red" style="margin-top:10px" onclick="ctx.clearRect(0,0,600,400)">Effacer tout</button>
+        </div>
+    </div>
+
+    <div id="chat">
+        <div style="padding:10px; background:var(--panel); font-weight:bold; display:flex; justify-content:space-between;">
+            Tchat Hub <span class="is-mobile" onclick="toggleChat()">✖</span>
+        </div>
+        <div id="msgs" style="flex:1; overflow-y:auto; padding:10px; font-size:14px;"></div>
+        <input id="chat-i" style="background:#0d1117; border:none; border-top:1px solid #30363d; padding:15px; color:white; outline:none;" placeholder="Message..." onkeypress="if(event.key==='Enter') sendM()">
+    </div>
+
+    <div id="nav-mobile">
+        <button onclick="nav('Accueil')" style="background:none; color:white;">🏠<br><small>Accueil</small></button>
+        <button onclick="nav('Paint')" style="background:none; color:white;">🎨<br><small>Paint</small></button>
+        <button onclick="toggleChat()" style="background:none; color:white;">💬<br><small>Chat</small></button>
+    </div>
+
+    <script>
+        const socket = io();
+        const pseudo = prompt("Ton Pseudo :") || "Joueur" + Math.floor(Math.random()*100);
+        const deviceChoice = confirm("Es-tu sur MOBILE ?") ? "mobile" : "desktop";
+        
+        document.body.className = "is-" + deviceChoice;
+        document.getElementById('my-pseudo').innerText = pseudo;
+        document.getElementById('my-avatar').innerText = pseudo.charAt(0).toUpperCase();
+
+        let curR = null, mySym = "X", isTurn = false, pendingDefi = null, gState = Array(9).fill("");
+
+        socket.emit('join', {pseudo: pseudo, device: deviceChoice});
+
+        function nav(id) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-'+id).classList.add('active');
+        }
+
+        function toggleChat() {
+            let c = document.getElementById('chat');
+            c.style.display = (c.style.display === 'flex') ? 'none' : 'flex';
+        }
+
+        socket.on('update_users', users => {
+            let html = "";
+            for(let id in users) {
+                if(id === socket.id) continue;
+                let u = users[id];
+                html += `<div class="user-card">
+                    <span><b>${u.pseudo}</b><br><small style="color:gray">${u.activity}</small></span>
+                    <button class="btn-blue" onclick="lancerDefi('${id}')">⚔️</button>
+                </div>`;
+            }
+            document.getElementById('u-list-desktop').innerHTML = html;
+            document.getElementById('u-list-mobile').innerHTML = html;
+        });
+
+        function lancerDefi(tid) {
+            let game = confirm("OK pour Morpion, ANNULER pour Shifumi") ? "Morpion" : "Shifumi";
+            socket.emit('envoyer_defi', {target_id: tid, game_type: game});
+        }
+
+        socket.on('reception_defi', d => {
+            pendingDefi = d;
+            document.getElementById('m-body').innerText = `${d.from_name} te défie au ${d.game} !`;
+            document.getElementById('modal').style.display = 'block';
+        });
+
+        function acceptD() {
+            socket.emit('accepter_defi', {challenger_id: pendingDefi.from_id, game: pendingDefi.game});
+            closeM();
+        }
+        function closeM() { document.getElementById('modal').style.display = 'none'; }
+
+        socket.on('start_duel', d => {
+            curR = d.room; mySym = d.sym; isTurn = d.turn;
+            gState.fill("");
+            document.querySelectorAll('.cell').forEach(c => c.innerText = "");
+            nav(d.game);
+            document.getElementById('m-status').innerText = isTurn ? "C'est ton tour !" : "Attente de l'autre...";
+        });
+
+        // MORPION
+        function playTic(i) {
+            if(!isTurn || gState[i] !== "" || !curR) return;
+            gState[i] = mySym;
+            document.querySelectorAll('.cell')[i].innerText = mySym;
+            socket.emit('coup_morpion', {index: i, sym: mySym, room: curR});
+            isTurn = false;
+            document.getElementById('m-status').innerText = "Attente de l'autre...";
+            checkWin();
+        }
+        socket.on('receive_move', d => {
+            gState[d.index] = d.sym;
+            document.querySelectorAll('.cell')[d.index].innerText = d.sym;
+            isTurn = true;
+            document.getElementById('m-status').innerText = "C'est ton tour !";
+            checkWin();
+        });
+
+        function checkWin() {
+            const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            for(let l of lines) {
+                if(gState[l[0]] && gState[l[0]] === gState[l[1]] && gState[l[0]] === gState[l[2]]) {
+                    alert(gState[l[0]] === mySym ? "VICTOIRE !" : "DÉFAITE...");
+                    socket.emit('quitter_duel', {room: curR});
+                    return;
+                }
+            }
+        }
+
+        // SHIFUMI
+        function playS(move) {
+            document.getElementById('s-status').innerText = "Coup envoyé, attente...";
+            socket.emit('coup_shifumi', {room: curR, move: move});
+        }
+        socket.on('resultat_shifumi', d => {
+            let mCoup = (socket.id === d.p1) ? d.m1 : d.m2;
+            let sCoup = (socket.id === d.p1) ? d.m2 : d.m1;
+            alert(`Toi: ${mCoup} | Adversaire: ${sCoup}`);
+            document.getElementById('s-status').innerText = "On recommence ?";
+        });
+
+        // PAINT
+        const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+        let drawing = false, lx=0, ly=0;
+        const getXY = e => {
+            let r = canvas.getBoundingClientRect();
+            let cx = e.touches ? e.touches[0].clientX : e.clientX;
+            let cy = e.touches ? e.touches[0].clientY : e.clientY;
+            return {x: (cx - r.left) * (canvas.width / r.width), y: (cy - r.top) * (canvas.height / r.height)};
+        }
+        const start = e => { drawing=true; let p=getXY(e); lx=p.x; ly=p.y; }
+        const draw = e => {
+            if(!drawing) return;
+            if(e.cancelable) e.preventDefault();
+            let p=getXY(e);
+            ctx.beginPath(); ctx.strokeStyle= (deviceChoice==='mobile')?"#58a6ff":"#f85149";
+            ctx.lineWidth=4; ctx.lineCap='round'; ctx.moveTo(lx, ly); ctx.lineTo(p.x, p.y); ctx.stroke();
+            socket.emit('draw_data', {x1:lx, y1:ly, x2:p.x, y2:p.y, c:ctx.strokeStyle});
+            lx=p.x; ly=p.y;
+        }
+        canvas.onmousedown=start; canvas.onmousemove=draw; window.onmouseup=()=>drawing=false;
+        canvas.ontouchstart=start; canvas.ontouchmove=draw; canvas.ontouchend=()=>drawing=false;
+        socket.on('draw_remote', d => {
+            ctx.beginPath(); ctx.strokeStyle=d.c; ctx.lineWidth=4; ctx.moveTo(d.x1, d.y1); ctx.lineTo(d.x2, d.y2); ctx.stroke();
+        });
+
+        // TCHAT
+        function sendM() {
+            let i = document.getElementById('chat-i');
+            if(i.value) socket.emit('msg', {m: i.value});
+            i.value = "";
+        }
+        socket.on('new_msg', d => {
+            let m = document.getElementById('msgs');
+            m.innerHTML += `<div><b style="color:var(--accent)">${d.p}:</b> ${d.m}</div>`;
+            m.scrollTop = m.scrollHeight;
+        });
+
+        socket.on('fin_duel', () => { curR = null; nav('Accueil'); });
+    </script>
+</body>
+</html>
