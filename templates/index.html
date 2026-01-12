@@ -3,180 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sorek Ultimate Hub</title>
+    <title>Sorek ClickWars Elite</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         :root { --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --border: #30363d; --red: #f85149; }
-        body { background: var(--bg); color: #c9d1d9; font-family: sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* AUTH */
+        body { background: var(--bg); color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+
+        /* AUTH OVERLAY */
         #auth-overlay { position: fixed; inset: 0; background: #000; z-index: 2000; display: flex; align-items: center; justify-content: center; }
-        .auth-box { background: var(--panel); padding: 30px; border-radius: 12px; border: 1px solid var(--accent); text-align: center; width: 300px; }
+        .auth-box { background: var(--panel); padding: 30px; border-radius: 12px; border: 1px solid var(--accent); text-align: center; width: 300px; box-shadow: 0 0 40px rgba(88,166,255,0.2); }
 
-        /* TCHAT GAUCHE */
+        /* SIDEBAR GAUCHE (TCHAT) */
         #left-bar { width: 280px; background: #010409; border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-        #chat-box { flex: 1; overflow-y: auto; padding: 10px; font-size: 0.85rem; }
-        .msg { margin-bottom: 8px; border-bottom: 1px solid #161b22; padding-bottom: 4px; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 15px; font-size: 0.85rem; }
+        .msg { margin-bottom: 8px; border-bottom: 1px solid #161b22; padding-bottom: 4px; animation: slide 0.2s ease; }
+        @keyframes slide { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
 
-        /* CENTRE : CLICKER & JEUX */
-        #center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 20px; }
-        .click-btn { width: 180px; height: 180px; border-radius: 50%; border: 6px solid var(--accent); background: var(--panel); color: white; font-size: 1.5rem; cursor: pointer; box-shadow: 0 0 20px rgba(88,166,255,0.2); transition: 0.1s; }
-        .click-btn:active { transform: scale(0.92); }
+        /* CENTRE (CLICKER) */
+        #center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 20px; text-align: center; }
+        .click-btn { width: 220px; height: 220px; border-radius: 50%; border: 8px solid var(--accent); background: var(--panel); color: white; font-size: 2rem; cursor: pointer; transition: 0.1s; box-shadow: 0 0 30px rgba(88,166,255,0.1); }
+        .click-btn:active { transform: scale(0.92); box-shadow: 0 0 10px var(--accent); }
 
-        /* DROITE : LEADERBOARD & PUBS */
-        #right-bar { width: 220px; background: #010409; border-left: 1px solid var(--border); padding: 10px; display: flex; flex-direction: column; }
-        .lb-item { font-size: 0.8rem; padding: 5px; background: var(--panel); margin: 2px 0; border-radius: 4px; }
-        .ad-zone { margin-top: auto; background: #1b1f23; border: 1px dashed #444; height: 150px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: #58a6ff; cursor: pointer; }
+        /* SIDEBAR DROITE (CLASSEMENT & PUBS) */
+        #right-bar { width: 240px; background: #010409; border-left: 1px solid var(--border); padding: 15px; display: flex; flex-direction: column; }
+        .lb-item { font-size: 0.85rem; padding: 10px; background: var(--panel); margin-bottom: 5px; border-radius: 6px; display: flex; justify-content: space-between; transition: 0.3s; }
+        .ad-zone { margin-top: auto; background: #1b1f23; border: 1px dashed #444; height: 180px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 0.75rem; color: var(--accent); cursor: pointer; border-radius: 8px; }
 
-        /* MODAL JEU */
-        #game-view { display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1500; flex-direction: column; align-items: center; justify-content: center; }
-        .grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; margin-top: 20px; }
-        .cell { width: 100px; height: 100px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 2rem; cursor: pointer; }
+        /* JEU MORPION */
+        #game-view { display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1500; flex-direction: column; align-items: center; justify-content: center; }
+        .grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; margin: 20px; }
+        .cell { width: 100px; height: 100px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; cursor: pointer; border-radius: 8px; }
 
-        input { background: #000; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 4px; width: 100%; margin: 5px 0; box-sizing: border-box; }
-        .btn { background: var(--accent); border: none; padding: 10px; color: white; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; font-weight: bold; }
-        .btn-small { padding: 4px 8px; font-size: 0.7rem; width: auto; }
+        /* FORM ELEMENTS */
+        input { background: #000; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 6px; width: 100%; margin: 8px 0; box-sizing: border-box; outline: none; }
+        input:focus { border-color: var(--accent); }
+        .btn { background: var(--accent); border: none; padding: 12px; color: white; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; transition: 0.2s; }
+        .btn:hover { filter: brightness(1.2); }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h2 style="color:var(--accent)">SOREK HUB</h2>
-            <div id="err" style="color:var(--red); font-size:0.7rem; margin-bottom:5px"></div>
+            <h2 style="color:var(--accent); margin-top:0;">SOREK HUB</h2>
+            <div id="auth-err" style="color:var(--red); font-size:0.75rem; margin-bottom:10px;"></div>
             <input id="u" placeholder="Pseudo">
             <input id="p" type="password" placeholder="Mot de passe">
             <button class="btn" onclick="auth('login')">CONNEXION</button>
-            <button class="btn" style="background:none; border:1px solid var(--accent); color:var(--accent)" onclick="auth('register')">S'INSCRIRE</button>
+            <button class="btn" style="background:none; border:1px solid var(--accent); color:var(--accent); margin-top:10px;" onclick="auth('register')">CRÉER UN COMPTE</button>
         </div>
     </div>
 
     <div id="left-bar">
-        <div style="padding:10px; background:var(--panel); font-weight:bold; font-size:0.8rem">TCHAT & JOUEURS</div>
+        <div style="padding:15px; background:var(--panel); font-weight:bold; border-bottom:1px solid var(--border)">TCHAT GLOBAL</div>
         <div id="chat-box"></div>
         <div style="padding:10px; border-top:1px solid var(--border)">
-            <input id="mi" placeholder="Message..." onkeypress="if(event.key==='Enter')send()">
+            <input id="mi" placeholder="Ton message..." onkeypress="if(event.key==='Enter')sendMsg()">
         </div>
-        <div id="users-online" style="padding:10px; flex: 0.5; border-top: 1px solid var(--border); overflow-y: auto;"></div>
+        <div style="padding:10px; font-weight:bold; font-size:0.8rem; background: #010409;">JOUEURS EN LIGNE</div>
+        <div id="users-list" style="flex:0.6; overflow-y:auto; padding:10px;"></div>
     </div>
 
     <div id="center">
-        <h1 id="score">Clics: 0</h1>
-        <p id="mult-status" style="color:var(--accent)">Puissance: x1</p>
-        <button class="click-btn" onclick="doClick()">CLICK!</button>
-        <button class="btn" id="up-btn" style="width:200px; margin-top:20px" onclick="buyUp()">Upgrade (Prix: 100)</button>
+        <h1 id="score-display" style="font-size:3rem; margin:0;">0</h1>
+        <p id="mult-display" style="color:var(--accent); font-weight:bold; margin-bottom:20px;">Puissance: x1</p>
+        <button class="click-btn" onclick="clickAction()">CLIQUE !</button>
+        <button class="btn" id="up-btn" style="width:250px; margin-top:30px; font-size:1.1rem;" onclick="buyUpgrade()">AMÉLIORER (100 💰)</button>
         
-        <div class="ad-zone" style="margin-top:30px; width: 300px; height: 60px;">
-            <a href="#" style="color:inherit; text-decoration:none">ANNOUNCE: Suivez Sorek sur les réseaux !</a>
-        </div>
+        <div style="margin-top:40px; color:#444; font-size:0.8rem;">SOREK HUB V4.0 - 2026</div>
     </div>
 
     <div id="right-bar">
-        <div style="font-size:0.8rem; font-weight:bold; margin-bottom:10px">CLASSEMENT</div>
-        <div id="lb"></div>
-        <div class="ad-zone">
-            PUB : Hébergement<br>pro à 2€/mois
+        <div style="font-weight:bold; margin-bottom:15px; color:var(--accent)">CLASSEMENT LIVE 🏆</div>
+        <div id="leaderboard-box" style="flex:1;"></div>
+        
+        <div class="ad-zone" onclick="alert('Lien publicitaire vers ton Discord ou Boutique !')">
+            <b>PUB</b><br>Espace disponible<br><span style="font-size:0.6rem; opacity:0.6;">Contacte l'admin</span>
         </div>
     </div>
 
     <div id="game-view">
-        <h2 id="g-info">Morpion vs ...</h2>
-        <div id="m-status">Ton tour !</div>
+        <h2 id="opp-name">Duel contre ...</h2>
+        <div id="game-status" style="color:var(--accent); margin-bottom:10px;">Ton tour !</div>
         <div class="grid">
-            <div class="cell" onclick="mMove(0)"></div><div class="cell" onclick="mMove(1)"></div><div class="cell" onclick="mMove(2)"></div>
-            <div class="cell" onclick="mMove(3)"></div><div class="cell" onclick="mMove(4)"></div><div class="cell" onclick="mMove(5)"></div>
-            <div class="cell" onclick="mMove(6)"></div><div class="cell" onclick="mMove(7)"></div><div class="cell" onclick="mMove(8)"></div>
+            <div class="cell" onclick="makeMove(0)"></div><div class="cell" onclick="makeMove(1)"></div><div class="cell" onclick="makeMove(2)"></div>
+            <div class="cell" onclick="makeMove(3)"></div><div class="cell" onclick="makeMove(4)"></div><div class="cell" onclick="makeMove(5)"></div>
+            <div class="cell" onclick="makeMove(6)"></div><div class="cell" onclick="makeMove(7)"></div><div class="cell" onclick="makeMove(8)"></div>
         </div>
-        <button class="btn btn-red" style="width:150px; margin-top:30px" onclick="location.reload()">QUITTER</button>
+        <button class="btn" style="width:120px; background:var(--red);" onclick="location.reload()">ABANDON</button>
     </div>
 
     <script>
         const socket = io();
-        let mySid = "";
+        let myPseudo = "";
         let currentRoom = null;
         let myTurn = false;
+        let myMultiplier = 1;
 
-        function auth(type) {
+        // AUTH
+        function auth(t) {
             socket.emit('login_action', {
                 pseudo: document.getElementById('u').value, 
                 password: document.getElementById('p').value,
-                type: type
+                type: t
             });
         }
-
-        socket.on('auth_error', m => document.getElementById('err').innerText = m);
-        
+        socket.on('auth_error', m => document.getElementById('auth-err').innerText = m);
         socket.on('login_ok', d => {
+            myPseudo = d.pseudo;
+            myMultiplier = d.mult;
             document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('score').innerText = "Clics: " + d.clicks;
-            document.getElementById('mult-status').innerText = "Puissance: x" + d.mult;
-            document.getElementById('up-btn').innerText = `Upgrade (Prix: ${d.mult * 100})`;
+            document.getElementById('score-display').innerText = d.clicks;
+            document.getElementById('mult-display').innerText = "Puissance: x" + d.mult;
+            document.getElementById('up-btn').innerText = `AMÉLIORER (${d.mult * 100} 💰)`;
         });
 
-        // Clicker
-        function doClick() { socket.emit('add_click'); }
-        socket.on('update_score', d => document.getElementById('score').innerText = "Clics: " + d.clicks);
-        function buyUp() { socket.emit('buy_upgrade'); }
+        // CLICKER
+        function clickAction() {
+            socket.emit('add_click');
+            // Optimisation visuelle (prédiction)
+            let s = document.getElementById('score-display');
+            s.innerText = parseInt(s.innerText) + myMultiplier;
+        }
+        socket.on('update_score', d => document.getElementById('score-display').innerText = d.clicks);
+        function buyUpgrade() { socket.emit('buy_upgrade'); }
 
-        // Global Update (Users + LB)
-        socket.on('global_update', d => {
-            const uBox = document.getElementById('users-online');
-            uBox.innerHTML = "";
+        // LIVE LEADERBOARD
+        socket.on('update_leaderboard', data => {
+            const box = document.getElementById('leaderboard-box');
+            box.innerHTML = data.lb.map((u, i) => `
+                <div class="lb-item" style="${u.p === myPseudo ? 'border:1px solid var(--accent)' : ''}">
+                    <span>${i === 0 ? '👑' : '#'+(i+1)} <b>${u.p}</b></span>
+                    <span style="color:var(--accent)">${u.c}</span>
+                </div>
+            `).join('');
+        });
+
+        // USERS LIST
+        socket.on('update_users_list', d => {
+            const box = document.getElementById('users-list');
+            box.innerHTML = "";
             for(let sid in d.users) {
-                if(sid === socket.id) continue;
-                uBox.innerHTML += `<div style="font-size:0.75rem; margin-bottom:5px">
-                    ${d.users[sid]} <button class="btn-small" onclick="sendDefi('${sid}')">Défier</button>
-                </div>`;
+                if(d.users[sid] === myPseudo) continue;
+                box.innerHTML += `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; align-items:center;">
+                        <span style="font-size:0.8rem;">${d.users[sid]}</span>
+                        <button onclick="sendDefi('${sid}')" style="background:var(--accent); border:none; color:white; border-radius:4px; cursor:pointer; font-size:0.7rem; padding:3px 6px;">DÉFIER</button>
+                    </div>
+                `;
             }
-            const lbBox = document.getElementById('lb');
-            lbBox.innerHTML = d.lb.map((x, i) => `<div class="lb-item">#${i+1} ${x.p} (${x.c})</div>`).join('');
         });
 
-        // Chat
-        function send() {
-            let mi = document.getElementById('mi');
-            if(mi.value) socket.emit('msg', {m: mi.value});
-            mi.value = "";
+        // CHAT
+        function sendMsg() {
+            const i = document.getElementById('mi');
+            if(i.value) socket.emit('msg', {m: i.value});
+            i.value = "";
         }
         socket.on('new_msg', d => {
-            let b = document.getElementById('chat-box');
+            const b = document.getElementById('chat-box');
             b.innerHTML += `<div class="msg"><b>${d.p}:</b> ${d.m}</div>`;
             b.scrollTop = b.scrollHeight;
         });
 
-        // Morpion Logic
-        function sendDefi(sid) { socket.emit('send_defi', {target_sid: sid, game: 'Morpion'}); }
+        // JEU
+        function sendDefi(sid) { socket.emit('send_defi', {target_sid: sid}); }
         socket.on('receive_defi', d => {
-            if(confirm(`Défi au ${d.game} de ${d.from_name} ?`)) {
-                socket.emit('accept_defi', {opp_sid: d.from_sid, game: d.game});
-            }
+            if(confirm(`Défi Morpion de ${d.from_name} ?`)) socket.emit('accept_defi', {opp_sid: d.from_sid});
         });
-
         socket.on('start_game', d => {
-            currentRoom = d.room;
-            myTurn = d.turn;
+            currentRoom = d.room; myTurn = d.turn;
             document.getElementById('game-view').style.display = 'flex';
-            document.getElementById('g-info').innerText = `Morpion vs ${d.opp}`;
+            document.getElementById('opp-name').innerText = "Duel vs " + d.opp;
             document.querySelectorAll('.cell').forEach(c => c.innerText = "");
-            document.getElementById('m-status').innerText = myTurn ? "À toi !" : "Attente...";
+            updateGameStatus();
         });
-
-        function mMove(idx) {
+        function makeMove(i) {
             if(!myTurn) return;
             const cells = document.querySelectorAll('.cell');
-            if(cells[idx].innerText === "") {
-                cells[idx].innerText = "X";
-                myTurn = false;
-                document.getElementById('m-status').innerText = "Attente...";
-                socket.emit('game_move', {room: currentRoom, idx: idx, symbol: "X"});
+            if(cells[i].innerText === "") {
+                cells[i].innerText = "X"; myTurn = false;
+                socket.emit('game_move', {room: currentRoom, idx: i, sym: "X"});
+                updateGameStatus();
             }
         }
-
         socket.on('opp_move', d => {
             document.querySelectorAll('.cell')[d.idx].innerText = "O";
-            myTurn = true;
-            document.getElementById('m-status').innerText = "À toi !";
+            myTurn = true; updateGameStatus();
         });
+        function updateGameStatus() {
+            document.getElementById('game-status').innerText = myTurn ? "À TOI !" : "L'ADVERSAIRE RÉFLÉCHIT...";
+        }
     </script>
 </body>
 </html>
