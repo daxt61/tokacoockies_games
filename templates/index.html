@@ -6,189 +6,161 @@
     <title>Sorek Hub</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        :root { --bg: #0d1117; --panel: #161b22; --border: #30363d; --accent: #58a6ff; --green: #238636; --red: #da3633; --text: #c9d1d9; }
-        * { box-sizing: border-box; font-family: -apple-system, sans-serif; }
-        body { margin: 0; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        :root { --bg: #0d1117; --panel: #161b22; --border: #30363d; --accent: #58a6ff; --text: #c9d1d9; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: sans-serif; height: 100vh; display: flex; overflow: hidden; }
         
-        /* LOGIN */
-        #login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        .auth-card { background: var(--panel); border: 1px solid var(--border); padding: 30px; border-radius: 16px; width: 100%; max-width: 350px; text-align: center; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 1px solid var(--border); background: #010409; color: white; }
-        
-        /* LAYOUT */
-        #app { display: flex; flex: 1; overflow: hidden; }
-        #sidebar { width: 300px; border-right: 1px solid var(--border); background: #010409; padding: 20px; display: flex; flex-direction: column; }
-        #main { flex: 1; padding: 20px; position: relative; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-        
-        /* UI ELEMENTS */
-        .btn { padding: 12px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; color: white; transition: 0.2s; }
-        .btn-blue { background: var(--accent); width: 100%; }
-        .btn-red { background: var(--red); }
-        .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 10px; width: 100%; }
-        
-        /* VIEWS */
-        .view { display: none; width: 100%; flex-direction: column; align-items: center; }
-        .view.active { display: flex; }
+        /* AUTH */
+        #login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        .auth-card { background: var(--panel); padding: 30px; border-radius: 12px; border: 1px solid var(--border); width: 300px; text-align: center; }
+        input { width: 100%; padding: 10px; margin: 10px 0; background: #010409; border: 1px solid var(--border); color: white; border-radius: 6px; }
+
+        /* PANELS */
+        #sidebar-left { width: 260px; border-right: 1px solid var(--border); background: #010409; padding: 15px; }
+        #main-content { flex: 1; padding: 20px; display: flex; flex-direction: column; align-items: center; overflow-y: auto; }
+        #sidebar-right { width: 300px; border-left: 1px solid var(--border); background: #010409; display: flex; flex-direction: column; }
+
+        /* PAINT */
+        #paint-area { width: 100%; max-width: 700px; text-align: center; }
+        canvas { background: white; border-radius: 8px; cursor: crosshair; touch-action: none; width: 100%; height: 450px; }
+
+        /* CHAT */
+        #chat-msgs { flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; }
+        .msg { margin-bottom: 8px; background: var(--panel); padding: 8px; border-radius: 6px; }
+        #chat-input-area { padding: 10px; border-top: 1px solid var(--border); display: flex; }
 
         /* GAMES */
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 300px; margin: 20px; }
-        .cell { aspect-ratio: 1; background: var(--panel); border: 2px solid var(--border); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: bold; }
-        .click-btn { width: 180px; height: 180px; border-radius: 50%; background: var(--red); border: 8px solid #8e2321; font-size: 24px; color: white; font-weight: bold; box-shadow: 0 8px 0 #5c0f0f; }
-        .click-btn:active { transform: translateY(4px); box-shadow: 0 4px 0 #5c0f0f; }
-        canvas { background: white; border-radius: 12px; width: 100%; max-width: 600px; height: 400px; touch-action: none; }
-
+        .game-overlay { display: none; position: absolute; top: 50px; background: var(--bg); border: 2px solid var(--accent); padding: 20px; border-radius: 15px; z-index: 100; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; width: 240px; }
+        .cell { width: 75px; height: 75px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: bold; }
+        
+        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; background: var(--accent); color: white; font-weight: bold; }
+        .btn-defi { padding: 4px 8px; font-size: 12px; }
+        
         /* MODALE */
         #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 5000; align-items: center; justify-content: center; }
-        .modal-content { background: var(--panel); padding: 30px; border-radius: 20px; border: 1px solid var(--accent); text-align: center; width: 80%; max-width: 320px; }
-
-        /* MOBILE FIXES */
-        @media (max-width: 768px) {
-            #sidebar { display: none; }
-            #nav-mob { display: flex; position: fixed; bottom: 0; width: 100%; height: 65px; background: #010409; border-top: 1px solid var(--border); justify-content: space-around; align-items: center; }
-            #main { padding-bottom: 80px; }
-        }
-        #nav-mob { display: none; }
-        .nav-btn { background: none; border: none; color: var(--text); font-size: 20px; display: flex; flex-direction: column; align-items: center; }
+        .modal-box { background: var(--panel); padding: 20px; border-radius: 12px; border: 1px solid var(--accent); text-align: center; }
     </style>
 </head>
 <body>
 
-    <div id="modal">
-        <div class="modal-content">
-            <h2 id="modal-title">⚔️ Défi !</h2>
-            <p id="modal-body"></p>
-            <div id="modal-btns" style="display: flex; gap: 10px; margin-top: 20px;"></div>
-        </div>
-    </div>
-
     <div id="login-screen">
         <div class="auth-card">
-            <h1 style="color:var(--accent); margin-bottom: 20px;">tokacookies games hub</h1>
-            <div id="auth-forms">
-                <input id="user" type="text" placeholder="Pseudo">
-                <input id="pass" type="password" placeholder="Mot de passe">
-                <button class="btn btn-blue" onclick="auth('login_attempt')">CONNEXION</button>
-                <p style="font-size: 12px; margin-top: 15px; cursor: pointer; color: var(--accent);" onclick="toggleAuth(this)">Pas de compte ? Créer un compte</p>
-            </div>
+            <h2 style="color:var(--accent)">SOREK HUB</h2>
+            <input id="user" placeholder="Pseudo">
+            <input id="pass" type="password" placeholder="Mot de passe">
+            <button class="btn" style="width:100%" onclick="auth('login')">CONNEXION</button>
+            <p style="font-size:11px; cursor:pointer" onclick="auth('reg')">Créer un compte</p>
         </div>
     </div>
 
-    <div id="app">
-        <aside id="sidebar">
-            <h2 id="welcome-pc">Bienvenue</h2>
-            <hr style="border:0; border-top:1px solid var(--border); margin: 20px 0;">
-            <h4 style="color: var(--accent);">Joueurs en ligne</h4>
-            <div id="user-list-pc"></div>
-        </aside>
-
-        <main id="main">
-            <div id="v-home" class="view active">
-                <h2 id="welcome-mob">Salut !</h2>
-                <div id="user-list-mob" style="width: 100%;"></div>
-            </div>
-
-            <div id="v-morpion" class="view">
-                <h3>Morpion vs <span class="opp-name"></span></h3>
-                <div class="grid" id="tic-grid"></div>
-                <button class="btn btn-red" onclick="quit()">Abandonner</button>
-            </div>
-
-            <div id="v-clickwar" class="view">
-                <h3>Click War !</h3>
-                <h1 id="cw-timer">10</h1>
-                <button class="click-btn" onclick="cwHit()">TAP !</button>
-                <p>Mon score: <span id="my-cw">0</span></p>
-            </div>
-
-            <div id="v-paint" class="view">
-                <h3>🎨 Paint Collectif</h3>
-                <canvas id="canvas"></canvas>
-                <button class="btn btn-red" style="margin-top:10px" onclick="ctx.clearRect(0,0,canvas.width,canvas.height)">Effacer</button>
-            </div>
-        </main>
+    <div id="modal">
+        <div class="modal-box">
+            <h3 id="m-title"></h3>
+            <div id="m-btns" style="display:flex; gap:10px; margin-top:15px"></div>
+        </div>
     </div>
 
-    <nav id="nav-mob">
-        <button class="nav-btn" onclick="showV('home')">🏠<small>Accueil</small></button>
-        <button class="nav-btn" onclick="showV('paint')">🎨<small>Paint</small></button>
-        <button class="nav-btn" onclick="alert('Chat bientôt dispo en plein écran !')">💬<small>Chat</small></button>
-    </nav>
+    <div id="sidebar-left">
+        <h3 id="my-name">Chargement...</h3>
+        <p style="font-size:12px; color:var(--accent)">🏆 Victoires: <span id="my-wins">0</span></p>
+        <hr style="border:0; border-top:1px solid var(--border)">
+        <h4 style="color:#8b949e">EN LIGNE</h4>
+        <div id="user-list"></div>
+    </div>
+
+    <div id="main-content">
+        <div id="v-home">
+            <div id="paint-area">
+                <h3>🎨 Paint Public (Dessinez ici !)</h3>
+                <canvas id="canvas"></canvas>
+                <div style="margin-top:10px">
+                    <button class="btn" style="background:#da3633" onclick="ctx.clearRect(0,0,canvas.width,canvas.height)">Tout effacer</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="v-morpion" class="game-overlay">
+            <h3 id="m-status">Morpion vs ?</h3>
+            <div class="grid" id="tic-grid"></div>
+            <button class="btn" style="margin-top:15px; width:100%; background:#da3633" onclick="quit()">Quitter</button>
+        </div>
+        
+        <div id="v-cw" class="game-overlay">
+            <h3>⚡ Click War !</h3>
+            <h1 id="cw-timer">10</h1>
+            <button id="cw-btn" style="width:150px; height:150px; border-radius:50%; background:red; color:white; font-weight:bold; font-size:20px" onclick="cwHit()">TAPPE !</button>
+            <p>Ton score: <span id="my-cw">0</span></p>
+        </div>
+    </div>
+
+    <div id="sidebar-right">
+        <div style="padding:15px; border-bottom:1px solid var(--border)"><b>💬 TCHAT GLOBAL</b></div>
+        <div id="chat-msgs"></div>
+        <div id="chat-input-area">
+            <input id="chat-in" placeholder="Message..." style="margin:0; flex:1">
+            <button class="btn" onclick="sendMsg()" style="margin-left:5px">➤</button>
+        </div>
+    </div>
 
     <script>
         const socket = io();
-        let myPseudo = "", myWins = 0, isReg = false, curRoom = null, myTurn = false;
+        let myName = "", myWins = 0, myRoom = null, myTurn = false, cwScore = 0, timer = 0;
 
-        function toggleAuth(p) {
-            isReg = !isReg;
-            p.innerText = isReg ? "Déjà un compte ? Connexion" : "Pas de compte ? Créer un compte";
-            document.querySelector('.btn-blue').innerText = isReg ? "S'INSCRIRE" : "CONNEXION";
+        // AUTH
+        function auth(mode) {
+            const u = document.getElementById('user').value, p = document.getElementById('pass').value;
+            socket.emit(mode === 'reg' ? 'register' : 'login_attempt', {pseudo: u, pw: p});
         }
-
-        function auth(type) {
-            const data = {pseudo: document.getElementById('user').value, pw: document.getElementById('pass').value};
-            socket.emit(isReg ? 'register' : 'login_attempt', data);
-        }
-
         socket.on('auth_res', d => alert(d.msg));
         socket.on('login_success', d => {
-            myPseudo = d.pseudo; myWins = d.wins;
+            myName = d.pseudo; myWins = d.wins;
             document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('welcome-pc').innerText = `🏆 ${d.wins} - ${d.pseudo}`;
-            document.getElementById('welcome-mob').innerText = `Bienvenue, ${d.pseudo}`;
+            document.getElementById('my-name').innerText = myName;
+            document.getElementById('my-wins').innerText = myWins;
+            initPaint();
         });
 
+        // USERS
         socket.on('update_users', list => {
             let h = "";
             for(let id in list) {
                 if(id === socket.id) continue;
-                h += `<div class="card" style="display:flex; justify-content:space-between; align-items:center;">
-                    <div><b>${list[id].pseudo}</b><br><small>${list[id].status}</small></div>
-                    <button class="btn btn-blue" style="width:auto;" onclick="defi('${id}')">⚔️</button>
+                h += `<div class="msg" style="display:flex; justify-content:space-between; align-items:center">
+                    <span>${list[id].pseudo}</span>
+                    <button class="btn btn-defi" onclick="defi('${id}')">⚔️</button>
                 </div>`;
             }
-            document.getElementById('user-list-pc').innerHTML = h;
-            document.getElementById('user-list-mob').innerHTML = h;
+            document.getElementById('user-list').innerHTML = h;
         });
 
+        // DEFI
         function defi(id) {
-            const g = confirm("Morpion (OK) ou ClickWar (Annuler) ?") ? "Morpion" : "ClickWar";
+            const g = confirm("OK pour Morpion, Annuler pour ClickWar") ? "Morpion" : "CW";
             socket.emit('envoyer_defi', {target_id: id, game_type: g});
         }
-
         socket.on('reception_defi', d => {
-            showModal(`Défi de ${d.from_name}`, `Veux-tu jouer au ${d.game} ?`, [
-                {t: "OUI", c: "var(--green)", cb: () => socket.emit('accepter_defi', {challenger_id: d.from_id, game: d.game})},
-                {t: "NON", c: "var(--red)", cb: closeModal}
-            ]);
+            document.getElementById('m-title').innerText = `${d.from_name} te défie !`;
+            const div = document.getElementById('m-btns'); div.innerHTML = "";
+            const b1 = document.createElement('button'); b1.innerText = "ACCEPTER"; b1.className = "btn";
+            b1.onclick = () => { socket.emit('accepter_defi', {challenger_id: d.from_id, game: d.game}); document.getElementById('modal').style.display='none'; };
+            const b2 = document.createElement('button'); b2.innerText = "REFUSER"; b2.className = "btn"; b2.style.background = "red";
+            b2.onclick = () => document.getElementById('modal').style.display='none';
+            div.append(b1, b2); document.getElementById('modal').style.display = 'flex';
         });
 
-        function showModal(t, b, btns) {
-            document.getElementById('modal-title').innerText = t;
-            document.getElementById('modal-body').innerText = b;
-            const div = document.getElementById('modal-btns'); div.innerHTML = "";
-            btns.forEach(btn => {
-                const el = document.createElement('button'); el.className = "btn";
-                el.innerText = btn.t; el.style.background = btn.c; el.onclick = () => { btn.cb(); closeModal(); };
-                div.appendChild(el);
-            });
-            document.getElementById('modal').style.display = 'flex';
-        }
-        function closeModal() { document.getElementById('modal').style.display = 'none'; }
-
+        // JEUX
         socket.on('start_game', d => {
-            curRoom = d.room; myTurn = (d.role === 'p1');
-            document.querySelectorAll('.opp-name').forEach(e => e.innerText = d.opp);
-            showV(d.game.toLowerCase());
-            if(d.game === "Morpion") initTic();
-            if(d.game === "ClickWar") initCW();
+            myRoom = d.room; myTurn = (d.role === 'p1');
+            if(d.game === "Morpion") {
+                document.getElementById('v-morpion').style.display = 'block';
+                document.getElementById('m-status').innerText = `Morpion vs ${d.opp}`;
+                initTic();
+            } else {
+                document.getElementById('v-cw').style.display = 'block';
+                initCW();
+            }
         });
 
-        function showV(id) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.getElementById('v-'+id).classList.add('active');
-        }
-
-        // --- MORPION ---
         function initTic() {
             const g = document.getElementById('tic-grid'); g.innerHTML = "";
             for(let i=0; i<9; i++) {
@@ -196,73 +168,64 @@
                 c.onclick = () => {
                     if(!myTurn || c.innerText) return;
                     c.innerText = "X"; myTurn = false;
-                    socket.emit('game_action', {type: 'tic', idx: i});
-                    checkTic();
+                    socket.emit('game_action', {idx: i});
                 };
                 g.appendChild(c);
             }
         }
         socket.on('game_update', d => {
-            if(d.type === 'tic') {
-                const cells = document.querySelectorAll('.cell');
-                cells[d.idx].innerText = "O"; myTurn = true;
-                checkTic();
-            }
-            if(d.type === 'cw') {
-                document.getElementById('opp-cw').innerText = d.score;
-            }
+            const cells = document.querySelectorAll('.cell');
+            if(cells[d.idx]) { cells[d.idx].innerText = "O"; myTurn = true; }
         });
 
-        function checkTic() {
-            const c = Array.from(document.querySelectorAll('.cell')).map(e => e.innerText);
-            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            for(let s of wins) {
-                if(c[s[0]] && c[s[0]]===c[s[1]] && c[s[0]]===c[s[2]]) {
-                    if(c[s[0]] === "X") { alert("GAGNÉ !"); socket.emit('game_win', {}); }
-                    else alert("PERDU...");
-                    quit(); return;
-                }
-            }
-        }
-
-        // --- CLICK WAR ---
-        let myScore = 0, timer = 10;
         function initCW() {
-            myScore = 0; timer = 10;
-            document.getElementById('my-cw').innerText = "0";
+            cwScore = 0; timer = 10;
             const itv = setInterval(() => {
                 timer--; document.getElementById('cw-timer').innerText = timer;
-                if(timer <= 0) {
-                    clearInterval(itv);
-                    alert("Fin ! Ton score: " + myScore);
-                    socket.emit('quit_game', {}); showV('home');
-                }
+                if(timer <= 0) { clearInterval(itv); quit(); }
             }, 1000);
         }
-        function cwHit() {
-            if(timer <= 0) return;
-            myScore++; document.getElementById('my-cw').innerText = myScore;
-            socket.emit('game_action', {type: 'cw', score: myScore});
+        function cwHit() { if(timer > 0) { cwScore++; document.getElementById('my-cw').innerText = cwScore; } }
+
+        function quit() { 
+            socket.emit('quit_game');
+            document.getElementById('v-morpion').style.display = 'none';
+            document.getElementById('v-cw').style.display = 'none';
         }
+        socket.on('opp_left', () => { alert("L'adversaire est parti !"); quit(); });
 
-        function quit() { socket.emit('quit_game', {}); showV('home'); }
-        socket.on('opp_left', () => { alert("L'adversaire a quitté."); quit(); });
-
-        // --- PAINT ---
+        // PAINT
         const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
-        let drawing = false;
-        canvas.addEventListener('touchstart', (e) => { drawing=true; ctx.beginPath(); });
-        canvas.addEventListener('touchend', () => drawing=false);
-        canvas.addEventListener('touchmove', (e) => {
-            if(!drawing) return;
-            const r = canvas.getBoundingClientRect();
-            const x = (e.touches[0].clientX - r.left), y = (e.touches[0].clientY - r.top);
-            ctx.lineTo(x, y); ctx.stroke();
-            socket.emit('draw_data', {x, y, start: false});
-        });
+        function initPaint() {
+            canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+            let drawing = false;
+            const draw = (e) => {
+                if(!drawing) return;
+                const r = canvas.getBoundingClientRect();
+                const x = (e.clientX || e.touches[0].clientX) - r.left;
+                const y = (e.clientY || e.touches[0].clientY) - r.top;
+                ctx.lineTo(x, y); ctx.stroke();
+                socket.emit('draw_data', {x, y});
+            };
+            canvas.onmousedown = (e) => { drawing=true; ctx.beginPath(); };
+            canvas.onmousemove = draw;
+            window.onmouseup = () => drawing=false;
+            canvas.ontouchstart = (e) => { drawing=true; ctx.beginPath(); };
+            canvas.ontouchmove = draw;
+        }
         socket.on('draw_remote', d => { ctx.lineTo(d.x, d.y); ctx.stroke(); });
 
+        // CHAT
+        function sendMsg() {
+            const i = document.getElementById('chat-in');
+            if(i.value) { socket.emit('chat_msg', {m: i.value}); i.value = ""; }
+        }
+        socket.on('new_msg', d => {
+            const div = document.createElement('div'); div.className = "msg";
+            div.innerHTML = `<b style="color:var(--accent)">${d.u}:</b> ${d.m}`;
+            const box = document.getElementById('chat-msgs'); box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        });
     </script>
 </body>
 </html>
-
