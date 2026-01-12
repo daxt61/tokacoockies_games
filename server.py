@@ -23,27 +23,25 @@ def init_db():
 
 init_db()
 
-# --- ETAT DU SERVEUR ---
-connected_users = {} # sid -> {pseudo, wins, status, room}
-games = {}           # room_id -> {type, p1, p2, state...}
+connected_users = {} 
+games = {}           
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# --- AUTHENTIFICATION ---
 @socketio.on('register')
 def register(data):
     pseudo = html.escape(data['pseudo'].strip())
-    if len(pseudo) < 3: return emit('auth_res', {'ok': False, 'msg': 'Pseudo trop court'})
+    if len(pseudo) < 2: return emit('auth_res', {'ok': False, 'msg': 'Pseudo trop court'})
     pw = bcrypt.generate_password_hash(data['pw']).decode('utf-8')
     try:
         with get_db() as db:
             db.execute("INSERT INTO users (pseudo, password) VALUES (?, ?)", (pseudo, pw))
             db.commit()
-        emit('auth_res', {'ok': True, 'msg': 'Compte créé ! Connecte-toi.'})
+        emit('auth_res', {'ok': True, 'msg': 'Compte créé !'})
     except:
-        emit('auth_res', {'ok': False, 'msg': 'Ce pseudo existe déjà.'})
+        emit('auth_res', {'ok': False, 'msg': 'Pseudo déjà pris.'})
 
 @socketio.on('login_attempt')
 def login(data):
@@ -58,12 +56,13 @@ def login(data):
             emit('login_success', {'pseudo': user['pseudo'], 'wins': user['wins']})
             broadcast_users()
         else:
-            emit('auth_res', {'ok': False, 'msg': 'Identifiants invalides.'})
+            emit('auth_res', {'ok': False, 'msg': 'Erreur identifiants.'})
 
 @socketio.on('disconnect')
 def disc():
     if request.sid in connected_users:
-        leave_current_game(request.sid)
+        rid = connected_users[request.sid]['room']
+        if rid: emit('opp_left', room=rid)
         del connected_users[request.sid]
         broadcast_users()
 
@@ -72,11 +71,10 @@ def broadcast_users():
             for sid, u in connected_users.items()}
     emit('update_users', data, broadcast=True)
 
-# --- GESTION DES JEUX ---
 @socketio.on('envoyer_defi')
 def send_defi(data):
     target = data['target_id']
-    if target in connected_users and not connected_users[target]['room']:
+    if target in connected_users:
         emit('reception_defi', {
             'from_id': request.sid, 
             'from_name': connected_users[request.sid]['pseudo'], 
@@ -86,53 +84,24 @@ def send_defi(data):
 @socketio.on('accepter_defi')
 def accept(data):
     p1, p2 = data['challenger_id'], request.sid
-    g_type = data['game']
-    if p1 in connected_users and p2 in connected_users:
-        rid = f"game_{uuid.uuid4().hex[:6]}"
-        for p in [p1, p2]:
-            join_room(rid, sid=p)
-            connected_users[p]['room'] = rid
-            connected_users[p]['status'] = f"🔴 En Duel ({g_type})"
-        
-        games[rid] = {'type': g_type, 'p1': p1, 'p2': p2, 'board': [None]*9, 'scores': {p1:0, p2:0}}
-        emit('start_game', {'room': rid, 'game': g_type, 'role': 'p1', 'opp': connected_users[p2]['pseudo']}, room=p1)
-        emit('start_game', {'room': rid, 'game': g_type, 'role': 'p2', 'opp': connected_users[p1]['pseudo']}, room=p2)
-        broadcast_users()
+    rid = f"g_{uuid.uuid4().hex[:4]}"
+    join_room(rid, sid=p1); join_room(rid, sid=p2)
+    connected_users[p1]['room'] = rid; connected_users[p2]['room'] = rid
+    emit('start_game', {'room': rid, 'game': data['game'], 'role': 'p1', 'opp': connected_users[p2]['pseudo']}, room=p1)
+    emit('start_game', {'room': rid, 'game': data['game'], 'role': 'p2', 'opp': connected_users[p1]['pseudo']}, room=p2)
 
 @socketio.on('game_action')
-def game_action(data):
+def g_action(data):
     rid = connected_users[request.sid]['room']
-    if rid in games:
-        emit('game_update', data, room=rid, include_self=False)
-
-@socketio.on('game_win')
-def game_win(data):
-    if request.sid in connected_users:
-        with get_db() as db:
-            db.execute("UPDATE users SET wins = wins + 1 WHERE pseudo = ?", (connected_users[request.sid]['pseudo'],))
-            db.commit()
-            row = db.execute("SELECT wins FROM users WHERE pseudo = ?", (connected_users[request.sid]['pseudo'],)).fetchone()
-            connected_users[request.sid]['wins'] = row['wins']
-        emit('update_my_score', {'wins': row['wins']})
-        broadcast_users()
-
-def leave_current_game(sid):
-    rid = connected_users[sid]['room']
-    if rid:
-        emit('opp_left', room=rid)
-        if rid in games: del games[rid]
-        # On libère tout le monde dans la room
-        for cid, u in connected_users.items():
-            if u['room'] == rid:
-                u['room'] = None
-                u['status'] = '🟢 Libre'
+    if rid: emit('game_update', data, room=rid, include_self=False)
 
 @socketio.on('quit_game')
-def on_quit(data):
-    leave_current_game(request.sid)
-    broadcast_users()
+def quit_g(data):
+    rid = connected_users[request.sid]['room']
+    if rid:
+        emit('opp_left', room=rid)
+        connected_users[request.sid]['room'] = None
 
-# --- PAINT & CHAT ---
 @socketio.on('draw_data')
 def draw(data):
     emit('draw_remote', data, broadcast=True, include_self=False)
