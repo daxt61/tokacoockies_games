@@ -6,68 +6,71 @@
     <title>Sorek Hub</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        :root { --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --border: #30363d; --red: #f85149; }
-        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* Sidebar gauche (Joueurs) */
-        #sidebar { width: 260px; background: #000; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; }
-        #user-list { flex: 1; overflow-y: auto; margin-top: 10px; }
+        :root { --bg: #0d1117; --panel: #161b22; --border: #30363d; --accent: #58a6ff; --red: #f85149; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: white; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+        /* Colonne de gauche (Joueurs) */
+        #left-col { width: 250px; background: #010409; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; }
+        #user-list { flex: 1; overflow-y: auto; margin-top: 15px; }
         .user-card { background: var(--panel); padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); }
 
-        /* Zone centrale (Paint) */
-        #main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; overflow-y: auto; }
-        #canvas-wrap { background: white; border-radius: 12px; width: 100%; max-width: 700px; height: 400px; touch-action: none; position: relative; }
-        canvas { width: 100%; height: 100%; cursor: crosshair; border-radius: 12px; }
+        /* Centre (Zone de jeu / Paint) */
+        #center-col { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        #canvas-wrap { background: white; border-radius: 12px; width: 100%; max-width: 700px; height: 400px; touch-action: none; border: 2px solid var(--accent); }
+        canvas { width: 100%; height: 100%; border-radius: 10px; cursor: crosshair; }
 
-        /* Sidebar droite (Tchat) */
-        #chat-sidebar { width: 300px; background: #000; border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; }
+        /* Colonne de droite (Chat) */
+        #right-col { width: 300px; background: #010409; border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; }
         #msgs { flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; }
-        .msg { margin-bottom: 8px; line-height: 1.4; }
-        .input-box { display: flex; gap: 5px; padding-top: 10px; }
+        .msg { margin-bottom: 8px; line-height: 1.4; border-bottom: 1px solid #21262d; padding-bottom: 4px; }
         
+        /* Formulaires */
+        .input-box { display: flex; gap: 5px; margin-top: 10px; }
         input { background: #0d1117; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; flex: 1; }
-        .btn { background: var(--accent); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn { background: var(--accent); color: white; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-red { background: var(--red); }
 
         /* Login */
-        #login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; }
         .login-card { background: var(--panel); padding: 40px; border-radius: 15px; border: 1px solid var(--border); text-align: center; }
-        
         .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div id="login-screen">
+    <div id="login-overlay">
         <div class="login-card">
-            <h1 style="color:var(--accent); margin-bottom: 20px;">SOREK HUB</h1>
-            <input id="pseudo-in" placeholder="Choisis un pseudo..." style="width: 250px;"><br><br>
-            <button class="btn" style="width: 100%;" onclick="connecter()">REJOINDRE</button>
+            <h1 style="color:var(--accent); margin-bottom:20px;">SOREK HUB</h1>
+            <input id="pseudo-in" placeholder="Entre ton pseudo..." maxlength="12"><br><br>
+            <button class="btn" style="width:100%" onclick="rejoindre()">REJOINDRE</button>
         </div>
     </div>
 
-    <div id="sidebar">
-        <h2 id="my-pseudo" style="color:var(--accent); font-size: 1.2rem;">Pseudo</h2>
-        <hr style="width:100%; border:0; border-top:1px solid var(--border); margin: 15px 0;">
-        <p style="font-size: 0.8rem; color: #8b949e;">JOUEURS EN LIGNE</p>
+    <div id="left-col">
+        <h2 id="my-name" style="color:var(--accent); font-size: 1.2rem;">Pseudo</h2>
+        <hr style="border:0; border-top:1px solid var(--border); margin:15px 0;">
+        <p style="font-size: 0.75rem; color: #8b949e; margin-bottom:10px;">EN LIGNE</p>
         <div id="user-list"></div>
     </div>
 
-    <div id="main">
-        <h3>🎨 Paint Partagé</h3>
+    <div id="center-col">
+        <h3 style="margin-bottom:15px;">🎨 Paint Collaboratif</h3>
         <div id="canvas-wrap">
             <canvas id="canvas"></canvas>
         </div>
-        <div style="margin-top: 15px;">
-            <button class="btn" style="background: var(--red);" onclick="clearCanvas()">Tout effacer</button>
+        <div style="margin-top:15px; display:flex; gap:10px;">
+            <button class="btn btn-red" onclick="clean()">Effacer Tout</button>
+            <span style="color:#8b949e; font-size:0.8rem; align-self:center;">Mode : Noir (3px)</span>
         </div>
     </div>
 
-    <div id="chat-sidebar">
-        <div style="border-bottom: 1px solid var(--border); padding-bottom: 10px; font-weight: bold;">💬 TCHAT GLOBAL</div>
+    <div id="right-col">
+        <div style="font-weight:bold; color:var(--accent); border-bottom:1px solid var(--border); padding-bottom:10px;">💬 TCHAT GLOBAL</div>
         <div id="msgs"></div>
         <div class="input-box">
-            <input id="chat-i" placeholder="Ton message...">
-            <button class="btn" onclick="sendMsg()">➤</button>
+            <input id="chat-i" placeholder="Message..." autocomplete="off">
+            <button class="btn" onclick="send()">➤</button>
         </div>
     </div>
 
@@ -78,39 +81,38 @@
         let drawing = false;
         let lastX = 0, lastY = 0;
 
-        // --- FONCTION DE CONNEXION ---
-        function connecter() {
-            monPseudo = document.getElementById('pseudo-in').value.trim();
-            if (monPseudo.length < 2) return alert("Pseudo trop court !");
+        // --- AUTH ---
+        function rejoindre() {
+            const input = document.getElementById('pseudo-in');
+            monPseudo = input.value.trim();
+            if (monPseudo.length < 2) return alert("Pseudo trop court");
             
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('my-pseudo').innerText = monPseudo;
+            document.getElementById('login-overlay').classList.add('hidden');
+            document.getElementById('my-name').innerText = "👤 " + monPseudo;
             
-            // On prévient le serveur qu'on arrive
             socket.emit('join', { pseudo: monPseudo });
-            initPaint();
+            initDrawing();
         }
 
-        // --- LOGIQUE DU TCHAT ---
-        function sendMsg() {
-            const input = document.getElementById('chat-i');
-            if (input.value.trim()) {
-                socket.emit('msg', { m: input.value });
-                input.value = "";
+        // --- CHAT ---
+        function send() {
+            const i = document.getElementById('chat-i');
+            if (i.value.trim()) {
+                socket.emit('msg', { m: i.value });
+                i.value = "";
             }
         }
-
-        // Écouter les nouveaux messages
+        
         socket.on('new_msg', d => {
             const box = document.getElementById('msgs');
             const div = document.createElement('div');
             div.className = "msg";
-            div.innerHTML = `<b style="color:var(--accent)">${d.p}:</b> ${d.m}`;
+            div.innerHTML = `<b style="color:var(--accent)">${d.p} :</b> ${d.m}`;
             box.appendChild(div);
-            box.scrollTop = box.scrollHeight; // Scroll automatique
+            box.scrollTop = box.scrollHeight;
         });
 
-        // --- LISTE DES JOUEURS ---
+        // --- LISTE JOUEURS ---
         socket.on('update_users', users => {
             const list = document.getElementById('user-list');
             list.innerHTML = "";
@@ -124,65 +126,68 @@
             }
         });
 
-        // --- LOGIQUE DU PAINT ---
-        function initPaint() {
+        // --- PAINT ---
+        function initDrawing() {
             canvas.width = canvas.offsetWidth;
             canvas.height = canvas.offsetHeight;
             ctx.lineCap = 'round';
             ctx.lineWidth = 3;
+            ctx.strokeStyle = 'black';
+
+            const start = (e) => {
+                drawing = true;
+                const r = canvas.getBoundingClientRect();
+                const currX = (e.clientX || (e.touches ? e.touches[0].clientX : 0)) - r.left;
+                const currY = (e.clientY || (e.touches ? e.touches[0].clientY : 0)) - r.top;
+                [lastX, lastY] = [currX, currY];
+            };
 
             const draw = (e) => {
                 if (!drawing) return;
                 const r = canvas.getBoundingClientRect();
-                const x = (e.clientX || e.touches[0].clientX) - r.left;
-                const y = (e.clientY || e.touches[0].clientY) - r.top;
+                const x = (e.clientX || (e.touches ? e.touches[0].clientX : 0)) - r.left;
+                const y = (e.clientY || (e.touches ? e.touches[0].clientY : 0)) - r.top;
 
                 ctx.beginPath();
                 ctx.moveTo(lastX, lastY);
                 ctx.lineTo(x, y);
                 ctx.stroke();
 
-                // Envoi au serveur pour les autres
                 socket.emit('draw_data', { x1: lastX, y1: lastY, x2: x, y2: y, c: 'black', w: 3 });
-                
                 [lastX, lastY] = [x, y];
             };
 
-            canvas.onmousedown = (e) => { 
-                drawing = true; 
-                const r = canvas.getBoundingClientRect();
-                [lastX, lastY] = [e.clientX - r.left, e.clientY - r.top];
-            };
-            canvas.onmousemove = draw;
-            window.onmouseup = () => drawing = false;
+            canvas.addEventListener('mousedown', start);
+            canvas.addEventListener('mousemove', draw);
+            window.addEventListener('mouseup', () => drawing = false);
 
-            // Tactile (Mobile)
-            canvas.ontouchstart = (e) => { 
-                drawing = true; 
-                const r = canvas.getBoundingClientRect();
-                [lastX, lastY] = [e.touches[0].clientX - r.left, e.touches[0].clientY - r.top];
-            };
-            canvas.ontouchmove = draw;
-            canvas.ontouchend = () => drawing = false;
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); start(e); });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+            canvas.addEventListener('touchend', () => drawing = false);
         }
 
         socket.on('draw_remote', d => {
             ctx.beginPath();
+            ctx.strokeStyle = d.c;
+            ctx.lineWidth = d.w;
             ctx.moveTo(d.x1, d.y1);
             ctx.lineTo(d.x2, d.y2);
             ctx.stroke();
         });
 
-        function clearCanvas() {
+        function clean() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             socket.emit('clear_canvas');
         }
         socket.on('canvas_cleared', () => ctx.clearRect(0, 0, canvas.width, canvas.height));
 
         function defier(id) {
-            alert("Le système de duel sera activé dès que ton ami acceptera !");
             socket.emit('envoyer_defi', { target_id: id, game_type: 'Morpion' });
+            alert("Défi envoyé à l'adversaire !");
         }
+
+        // Touche Entrée pour le chat
+        document.getElementById('chat-i').addEventListener('keypress', e => { if(e.key==='Enter') send(); });
     </script>
 </body>
 </html>
