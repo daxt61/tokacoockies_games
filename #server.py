@@ -3,8 +3,8 @@ from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 app = Flask(__name__)
-# La clé secrète est nécessaire pour certaines fonctionnalités de session
 app.config['SECRET_KEY'] = 'sorek_secret_key'
+# Configuration spécifique pour Render et le temps réel
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 users = {} 
@@ -16,7 +16,6 @@ def index():
 
 @socketio.on('join')
 def on_join(data):
-    # Stockage des infos utilisateur
     users[request.sid] = {
         'pseudo': data.get('pseudo', 'Anonyme'), 
         'device': data.get('device', 'desktop'), 
@@ -34,7 +33,6 @@ def on_disc():
         del users[request.sid]
         emit('update_users', users, broadcast=True)
 
-# --- SYSTEME DE DEFIS SECURISE ---
 @socketio.on('envoyer_defi')
 def send_defi(data):
     target = data.get('target_id')
@@ -82,7 +80,6 @@ def quit_d(data):
     rid = data.get('room')
     if rid:
         emit('fin_duel', room=rid)
-        # Reset l'activité des joueurs de la room
         for sid, info in users.items():
             if info['room'] == rid:
                 info['room'] = None
@@ -99,5 +96,6 @@ def msg(data):
         emit('new_msg', {'p': users[request.sid]['pseudo'], 'm': data['m']}, broadcast=True)
 
 if __name__ == '__main__':
-    # Pour le test local : python server.py
-    socketio.run(app, debug=True)
+    # Cette partie est cruciale pour Render
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host='0.0.0.0', port=port)
