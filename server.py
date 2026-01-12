@@ -1,115 +1,108 @@
-import os, uuid, sqlite3, html
-from flask import Flask, render_template, request
+import os, uuid
+from flask import Flask, send_file, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
-from flask_bcrypt import Bcrypt
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'sorek_hub_2026_secret'
-bcrypt = Bcrypt(app)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+app.config['SECRET_KEY'] = 'sorek_secret_key'
+# Augmentation de la taille du buffer pour le Paint
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', max_http_buffer_size=1e7)
 
-# --- DATABASE ---
-def get_db():
-    db = sqlite3.connect('database.db')
-    db.row_factory = sqlite3.Row
-    return db
-
-def init_db():
-    with get_db() as db:
-        db.execute('''CREATE TABLE IF NOT EXISTS users 
-            (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-             pseudo TEXT UNIQUE, password TEXT, wins INTEGER DEFAULT 0)''')
-        db.commit()
-
-init_db()
-
-connected_users = {} 
-games = {}           
+users = {} 
+shifumi_data = {} 
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return send_file('index.html')
 
-@socketio.on('register')
-def register(data):
-    pseudo = html.escape(data['pseudo'].strip())
-    if len(pseudo) < 2: return emit('auth_res', {'ok': False, 'msg': 'Pseudo trop court'})
-    pw = bcrypt.generate_password_hash(data['pw']).decode('utf-8')
-    try:
-        with get_db() as db:
-            db.execute("INSERT INTO users (pseudo, password) VALUES (?, ?)", (pseudo, pw))
-            db.commit()
-        emit('auth_res', {'ok': True, 'msg': 'Compte créé !'})
-    except:
-        emit('auth_res', {'ok': False, 'msg': 'Pseudo déjà pris.'})
-
-@socketio.on('login_attempt')
-def login(data):
-    pseudo = data['pseudo'].strip()
-    with get_db() as db:
-        user = db.execute("SELECT * FROM users WHERE pseudo = ?", (pseudo,)).fetchone()
-        if user and bcrypt.check_password_hash(user['password'], data['pw']):
-            connected_users[request.sid] = {
-                'pseudo': user['pseudo'], 'wins': user['wins'], 
-                'status': '🟢 Libre', 'room': None
-            }
-            emit('login_success', {'pseudo': user['pseudo'], 'wins': user['wins']})
-            broadcast_users()
-        else:
-            emit('auth_res', {'ok': False, 'msg': 'Erreur identifiants.'})
+@socketio.on('join')
+def on_join(data):
+    # Correction : request.sid est accessible ici car on a importé request
+    users[request.sid] = {
+        'pseudo': data.get('pseudo', 'Anonyme'), 
+        'device': data.get('device', 'desktop'), 
+        'activity': '🏠 Accueil', 
+        'room': None
+    }
+    emit('update_users', users, broadcast=True)
 
 @socketio.on('disconnect')
-def disc():
-    if request.sid in connected_users:
-        rid = connected_users[request.sid]['room']
-        if rid: emit('opp_left', room=rid)
-        del connected_users[request.sid]
-        broadcast_users()
-
-def broadcast_users():
-    data = {sid: {'pseudo': u['pseudo'], 'wins': u['wins'], 'status': u['status']} 
-            for sid, u in connected_users.items()}
-    emit('update_users', data, broadcast=True)
+def on_disc():
+    if request.sid in users:
+        user_room = users[request.sid]['room']
+        if user_room:
+            emit('fin_duel', room=user_room)
+        del users[request.sid]
+        emit('update_users', users, broadcast=True)
 
 @socketio.on('envoyer_defi')
 def send_defi(data):
-    target = data['target_id']
-    if target in connected_users:
+    target = data.get('target_id')
+    if target in users:
         emit('reception_defi', {
             'from_id': request.sid, 
-            'from_name': connected_users[request.sid]['pseudo'], 
+            'from_name': users[request.sid]['pseudo'], 
             'game': data['game_type']
         }, room=target)
 
 @socketio.on('accepter_defi')
 def accept(data):
     p1, p2 = data['challenger_id'], request.sid
-    rid = f"g_{uuid.uuid4().hex[:4]}"
-    join_room(rid, sid=p1); join_room(rid, sid=p2)
-    connected_users[p1]['room'] = rid; connected_users[p2]['room'] = rid
-    emit('start_game', {'room': rid, 'game': data['game'], 'role': 'p1', 'opp': connected_users[p2]['pseudo']}, room=p1)
-    emit('start_game', {'room': rid, 'game': data['game'], 'role': 'p2', 'opp': connected_users[p1]['pseudo']}, room=p2)
+    gtype = data['game']
+    if p1 in users and p2 in users:
+        rid = f"room_{uuid.uuid4().hex[:6]}"
+        join_room(rid, sid=p1)
+        join_room(rid, sid=p2)
+        users[p1].update({'room': rid, 'activity': f'⚔️ {gtype}'})
+        users[p2].update({'room': rid, 'activity': f'⚔️ {gtype}'})
+        if gtype == "Shifumi": 
+            shifumi_data[rid] = {}
+        emit('start_duel', {'room': rid, 'game': gtype, 'opp': users[p2]['pseudo'], 'turn': True, 'sym': 'X'}, room=p1)
+        emit('start_duel', {'room': rid, 'game': gtype, 'opp': users[p1]['pseudo'], 'turn': False, 'sym': 'O'}, room=p2)
+        emit('update_users', users, broadcast=True)
 
-@socketio.on('game_action')
-def g_action(data):
-    rid = connected_users[request.sid]['room']
-    if rid: emit('game_update', data, room=rid, include_self=False)
+@socketio.on('coup_morpion')
+def coup_m(data):
+    emit('receive_move', data, room=data['room'], include_self=False)
 
-@socketio.on('quit_game')
-def quit_g(data):
-    rid = connected_users[request.sid]['room']
+@socketio.on('coup_shifumi')
+def coup_s(data):
+    rid, move = data['room'], data['move']
+    if rid in shifumi_data:
+        shifumi_data[rid][request.sid] = move
+        if len(shifumi_data[rid]) == 2:
+            p_ids = list(shifumi_data[rid].keys())
+            emit('resultat_shifumi', {
+                'p1': p_ids[0], 'm1': shifumi_data[rid][p_ids[0]], 
+                'p2': p_ids[1], 'm2': shifumi_data[rid][p_ids[1]]
+            }, room=rid)
+            shifumi_data[rid] = {}
+
+@socketio.on('quitter_duel')
+def quit_d(data):
+    rid = data.get('room')
     if rid:
-        emit('opp_left', room=rid)
-        connected_users[request.sid]['room'] = None
+        emit('fin_duel', room=rid)
+        # On remet les joueurs en mode Accueil
+        for sid in list(users.keys()):
+            if users[sid]['room'] == rid:
+                users[sid]['room'] = None
+                users[sid]['activity'] = '🏠 Accueil'
+        if rid in shifumi_data:
+            del shifumi_data[rid]
+        emit('update_users', users, broadcast=True)
 
 @socketio.on('draw_data')
 def draw(data):
     emit('draw_remote', data, broadcast=True, include_self=False)
 
-@socketio.on('chat_msg')
-def chat_msg(data):
-    if request.sid in connected_users:
-        emit('new_msg', {'u': connected_users[request.sid]['pseudo'], 'm': html.escape(data['m'])}, broadcast=True)
+@socketio.on('clear_canvas')
+def clear_canvas():
+    emit('canvas_cleared', broadcast=True, include_self=False)
+
+@socketio.on('msg')
+def msg(data):
+    if request.sid in users:
+        emit('new_msg', {'p': users[request.sid]['pseudo'], 'm': data['m']}, broadcast=True)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
