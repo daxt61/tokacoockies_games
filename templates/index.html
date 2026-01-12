@@ -3,106 +3,399 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sorek Hub</title>
+    <title>Sorek Hub Elite</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        :root { --bg: #0d1117; --panel: #161b22; --border: #30363d; --accent: #58a6ff; }
-        body { margin: 0; background: var(--bg); color: white; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        #sidebar { width: 250px; background: #010409; border-right: 1px solid var(--border); padding: 20px; }
-        #main { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-        #canvas-box { background: white; border-radius: 10px; width: 100%; max-width: 700px; height: 400px; touch-action: none; }
-        canvas { width: 100%; height: 100%; border-radius: 10px; cursor: crosshair; }
-        #chat { width: 300px; background: #010409; border-left: 1px solid var(--border); display: flex; flex-direction: column; padding: 15px; }
-        #msgs { flex: 1; overflow-y: auto; margin-bottom: 10px; }
-        input { background: #0d1117; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 100%; }
-        .btn { background: var(--accent); color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; margin-top: 5px; }
-        #login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 100; display: flex; align-items: center; justify-content: center; }
-        .hidden { display: none !important; }
+        :root { --bg: #0d1117; --side: #010409; --panel: #161b22; --accent: #58a6ff; --red: #f85149; --green: #3fb950; --border: #30363d; }
+        * { box-sizing: border-box; margin: 0; padding: 0; outline: none; user-select: none; }
+        body { background: var(--bg); color: #e6edf3; font-family: -apple-system, system-ui, sans-serif; display: flex; height: 100vh; overflow: hidden; }
+
+        /* --- LOGIN SCREEN --- */
+        #login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: var(--panel); padding: 40px; border-radius: 16px; border: 1px solid var(--border); text-align: center; width: 320px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+        .login-box h1 { color: var(--accent); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* --- LAYOUT --- */
+        #sidebar { width: 280px; background: var(--side); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; z-index: 10; }
+        #main { flex: 1; display: flex; flex-direction: column; position: relative; }
+        .view { display: none; flex: 1; padding: 20px; flex-direction: column; align-items: center; overflow-y: auto; }
+        .view.active { display: flex; }
+
+        /* --- COMPOSANTS --- */
+        .btn { background: var(--accent); color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; width: 100%; margin-top: 10px; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn-red { background: var(--red); }
+        .btn-green { background: var(--green); }
+        
+        input { background: #0d1117; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 8px; width: 100%; margin-bottom: 10px; text-align: center; }
+        input:focus { border-color: var(--accent); }
+
+        /* --- LISTE JOUEURS --- */
+        .user-card { background: var(--panel); padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); }
+        .status-dot { width: 8px; height: 8px; background: var(--green); border-radius: 50%; display: inline-block; margin-right: 5px; }
+
+        /* --- MORPION --- */
+        .grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; margin-top: 20px; }
+        .cell { width: 100px; height: 100px; background: var(--panel); border: 2px solid var(--border); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 3rem; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .cell:hover { background: #21262d; border-color: var(--accent); }
+
+        /* --- SHIFUMI --- */
+        .shifumi-box { display: flex; gap: 15px; margin-top: 30px; }
+        .s-btn { font-size: 40px; padding: 20px; background: var(--panel); border: 2px solid var(--border); border-radius: 15px; cursor: pointer; transition: 0.2s; }
+        .s-btn:hover { transform: scale(1.1); border-color: var(--accent); }
+
+        /* --- PAINT --- */
+        #canvas-wrap { background: white; border-radius: 12px; width: 100%; max-width: 800px; height: 500px; touch-action: none; border: 2px solid var(--accent); position: relative; margin-top: 10px; cursor: crosshair; overflow: hidden; }
+        canvas { width: 100%; height: 100%; }
+        .tools { display: flex; gap: 10px; margin-bottom: 10px; background: var(--panel); padding: 10px; border-radius: 10px; }
+        .color-dot { width: 25px; height: 25px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; }
+        .color-dot.active { border-color: white; transform: scale(1.2); }
+
+        /* --- TCHAT --- */
+        #chat-panel { position: fixed; bottom: 20px; right: 20px; width: 320px; height: 400px; background: var(--side); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: translateY(120%); transition: 0.3s; z-index: 100; }
+        #chat-panel.open { transform: translateY(0); }
+        #msgs { flex: 1; overflow-y: auto; padding: 10px; font-size: 14px; }
+        .msg { margin-bottom: 5px; word-break: break-word; }
+        .chat-toggle { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; background: var(--accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5); z-index: 101; font-size: 24px; }
+
+        /* --- MODAL DEFI --- */
+        #modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel); padding: 30px; border: 2px solid var(--accent); border-radius: 15px; z-index: 2000; text-align: center; width: 300px; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 1999; }
+
+        /* --- MOBILE --- */
+        @media (max-width: 600px) {
+            body { flex-direction: column; }
+            #sidebar { width: 100%; height: 70px; flex-direction: row; align-items: center; justify-content: space-between; padding: 10px; order: 2; border-top: 1px solid var(--border); border-right: none; }
+            #sidebar h3, #sidebar p { display: none; } /* Cache infos inutiles sur mobile */
+            #main { padding-bottom: 80px; }
+            #login-box { width: 90%; }
+            .grid { grid-template-columns: repeat(3, 80px); }
+            .cell { width: 80px; height: 80px; }
+            #canvas-wrap { height: 350px; }
+            #chat-panel { width: 100%; height: 100%; top: 0; right: 0; bottom: 0; border-radius: 0; }
+        }
     </style>
 </head>
 <body>
+
     <div id="login-screen">
-        <div style="background:var(--panel); padding:30px; border-radius:12px; border:1px solid var(--border); text-align:center;">
-            <h2>SOREK HUB</h2>
-            <input id="pseudo-in" placeholder="Pseudo..."><br><br>
-            <button class="btn" onclick="start()">ENTRER</button>
+        <div class="login-box">
+            <h1>SOREK HUB</h1>
+            <input id="pseudo-in" placeholder="Ton Pseudo..." maxlength="12">
+            <button class="btn" onclick="login()">ENTRER</button>
+        </div>
+    </div>
+
+    <div id="overlay"></div>
+    <div id="modal">
+        <h2 style="margin-bottom:10px">⚔️ DÉFI !</h2>
+        <p id="modal-text" style="color:#8b949e; margin-bottom:20px">...</p>
+        <div style="display:flex; gap:10px">
+            <button class="btn btn-green" onclick="acceptD()">ACCEPTER</button>
+            <button class="btn btn-red" onclick="closeM()">REFUSER</button>
         </div>
     </div>
 
     <div id="sidebar">
-        <h3 id="my-name">...</h3>
-        <div id="user-list" style="margin-top:20px"></div>
+        <div>
+            <h3 id="my-name" style="color:var(--accent)">...</h3>
+            <p style="font-size:12px; color:#8b949e">EN LIGNE</p>
+        </div>
+        <div id="user-list" style="flex:1; overflow-y:auto; margin-top:15px; margin-bottom:15px"></div>
+        <button class="btn" style="background:#21262d; border:1px solid var(--border); width:auto;" onclick="nav('Accueil')">🏠</button>
     </div>
 
     <div id="main">
-        <h3>🎨 Paint Collectif</h3>
-        <div id="canvas-box"><canvas id="canvas"></canvas></div>
-        <button class="btn" onclick="clearC()" style="background:#f85149">Effacer</button>
+        
+        <div id="view-Accueil" class="view active">
+            <h1>Bienvenue</h1>
+            <p style="color:#8b949e; margin-bottom:20px">Choisis un joueur à gauche pour le défier !</p>
+            <button class="btn" onclick="nav('Paint')" style="width:200px">🎨 Aller au Paint</button>
+        </div>
+
+        <div id="view-Morpion" class="view">
+            <h2>Morpion</h2>
+            <p id="m-status" style="color:var(--accent); margin-top:10px">En attente...</p>
+            <div class="grid">
+                <div class="cell" onclick="playTic(0)"></div><div class="cell" onclick="playTic(1)"></div><div class="cell" onclick="playTic(2)"></div>
+                <div class="cell" onclick="playTic(3)"></div><div class="cell" onclick="playTic(4)"></div><div class="cell" onclick="playTic(5)"></div>
+                <div class="cell" onclick="playTic(6)"></div><div class="cell" onclick="playTic(7)"></div><div class="cell" onclick="playTic(8)"></div>
+            </div>
+            <button class="btn btn-red" style="width:200px; margin-top:20px" onclick="quitGame()">Quitter</button>
+        </div>
+
+        <div id="view-Shifumi" class="view">
+            <h2>Shifumi</h2>
+            <p id="s-status" style="color:var(--accent); margin-top:10px">Choisis ton arme !</p>
+            <div class="shifumi-box">
+                <div class="s-btn" onclick="playS('Pierre')">🪨</div>
+                <div class="s-btn" onclick="playS('Feuille')">📄</div>
+                <div class="s-btn" onclick="playS('Ciseaux')">✂️</div>
+            </div>
+            <button class="btn btn-red" style="width:200px; margin-top:40px" onclick="quitGame()">Quitter</button>
+        </div>
+
+        <div id="view-Paint" class="view">
+            <div class="tools">
+                <div class="color-dot active" style="background:black" onclick="setC('black', this)"></div>
+                <div class="color-dot" style="background:#f85149" onclick="setC('#f85149', this)"></div>
+                <div class="color-dot" style="background:#3fb950" onclick="setC('#3fb950', this)"></div>
+                <div class="color-dot" style="background:#58a6ff" onclick="setC('#58a6ff', this)"></div>
+                <button class="btn btn-red" style="padding:5px 10px; margin:0; width:auto; font-size:12px" onclick="clearC()">Effacer</button>
+            </div>
+            <div id="canvas-wrap">
+                <canvas id="canvas"></canvas>
+            </div>
+        </div>
     </div>
 
-    <div id="chat">
+    <div class="chat-toggle" onclick="toggleChat()">💬</div>
+    <div id="chat-panel">
+        <div style="padding:10px; border-bottom:1px solid var(--border); font-weight:bold; display:flex; justify-content:space-between">
+            <span>Tchat Global</span>
+            <span onclick="toggleChat()" style="cursor:pointer">✖</span>
+        </div>
         <div id="msgs"></div>
-        <input id="chat-in" placeholder="Message...">
-        <button class="btn" onclick="send()">Envoyer</button>
+        <div style="padding:10px; display:flex; gap:5px">
+            <input id="chat-i" placeholder="Message..." style="margin:0">
+            <button class="btn" style="width:auto; margin:0" onclick="send()">➤</button>
+        </div>
     </div>
 
     <script>
         const socket = io();
-        const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
-        let drawing = false, lx=0, ly=0;
+        let myPseudo = "";
+        let currentRoom = null;
+        let pendingDefi = null;
 
-        function start() {
-            const p = document.getElementById('pseudo-in').value;
-            if(!p) return;
-            document.getElementById('login-screen').classList.add('hidden');
-            document.getElementById('my-name').innerText = p;
+        // --- LOGIN ---
+        function login() {
+            const p = document.getElementById('pseudo-in').value.trim();
+            if(p.length < 2) return alert("Pseudo trop court !");
+            myPseudo = p;
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('my-name').innerText = "👤 " + p;
             socket.emit('join', { pseudo: p });
-            initP();
+            initPaint(); // Init paint une fois connecté
         }
 
-        function send() {
-            const i = document.getElementById('chat-in');
-            socket.emit('msg', { m: i.value });
-            i.value = "";
+        // --- NAVIGATION ---
+        function nav(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-'+viewId).classList.add('active');
         }
 
-        socket.on('new_msg', d => {
-            const m = document.getElementById('msgs');
-            m.innerHTML += `<div><b>${d.p}:</b> ${d.m}</div>`;
-            m.scrollTop = m.scrollHeight;
-        });
-
+        // --- LISTE JOUEURS ---
         socket.on('update_users', users => {
-            const l = document.getElementById('user-list');
-            l.innerHTML = "";
-            for(let id in users) l.innerHTML += `<div>• ${users[id].pseudo}</div>`;
+            const list = document.getElementById('user-list');
+            list.innerHTML = "";
+            for(let id in users) {
+                if(id === socket.id) continue;
+                const u = users[id];
+                const div = document.createElement('div');
+                div.className = "user-card";
+                div.innerHTML = `
+                    <div><span class="status-dot"></span>${u.pseudo}</div>
+                    <button class="btn" style="width:auto; padding:5px 10px; margin:0; font-size:12px" onclick="defier('${id}')">⚔️</button>
+                `;
+                list.appendChild(div);
+            }
         });
 
-        function initP() {
-            canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
-            const draw = (e) => {
-                if(!drawing) return;
-                const r = canvas.getBoundingClientRect();
-                const x = (e.clientX || e.touches[0].clientX) - r.left;
-                const y = (e.clientY || e.touches[0].clientY) - r.top;
-                ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(x, y); ctx.stroke();
-                socket.emit('draw_data', {x1:lx, y1:ly, x2:x, y2:y});
-                lx=x; ly=y;
-            };
-            canvas.onmousedown = (e) => { drawing=true; const r=canvas.getBoundingClientRect(); lx=e.clientX-r.left; ly=e.clientY-r.top; };
-            canvas.onmousemove = draw;
-            window.onmouseup = () => drawing=false;
-            canvas.ontouchstart = (e) => { drawing=true; const r=canvas.getBoundingClientRect(); lx=e.touches[0].clientX-r.left; ly=e.touches[0].top; };
-            canvas.ontouchmove = (e) => { e.preventDefault(); draw(e); };
-            canvas.ontouchend = () => drawing=false;
+        // --- DEFI SYSTEM ---
+        function defier(id) {
+            if(confirm("Morpion (OK) ou Shifumi (Annuler) ?")) {
+                socket.emit('envoyer_defi', { target_id: id, game_type: 'Morpion' });
+            } else {
+                socket.emit('envoyer_defi', { target_id: id, game_type: 'Shifumi' });
+            }
         }
+
+        socket.on('reception_defi', data => {
+            pendingDefi = data;
+            document.getElementById('modal-text').innerText = `${data.from_name} veut jouer au ${data.game}`;
+            document.getElementById('modal').style.display = 'block';
+            document.getElementById('overlay').style.display = 'block';
+            playSound('notif');
+        });
+
+        function acceptD() {
+            if(pendingDefi) socket.emit('accepter_defi', { challenger_id: pendingDefi.from_id, game: pendingDefi.game });
+            closeM();
+        }
+        function closeM() {
+            document.getElementById('modal').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+        }
+
+        // --- JEUX LOGIQUE ---
+        socket.on('start_duel', data => {
+            currentRoom = data.room;
+            nav(data.game);
+            
+            // Reset Morpion
+            if(data.game === 'Morpion') {
+                document.querySelectorAll('.cell').forEach(c => c.innerText = "");
+                document.getElementById('m-status').innerText = data.turn ? "C'est ton tour !" : "Au tour de " + data.opp;
+            }
+            // Reset Shifumi
+            if(data.game === 'Shifumi') {
+                document.getElementById('s-status').innerText = "VS " + data.opp;
+            }
+        });
+
+        socket.on('fin_duel', () => {
+            alert("Le duel est terminé (déconnexion ou abandon).");
+            currentRoom = null;
+            nav('Accueil');
+        });
+
+        function quitGame() {
+            if(currentRoom) socket.emit('quitter_duel', { room: currentRoom });
+        }
+
+        // Morpion
+        function playTic(idx) {
+            if(!currentRoom) return;
+            const cell = document.querySelectorAll('.cell')[idx];
+            if(cell.innerText === "") {
+                socket.emit('coup_morpion', { room: currentRoom, index: idx, sym: '?' }); // Le serveur gère pas le symbole ici, juste le relais, on simplifie
+                // Note: Dans une version pro, on gérerait le symbole localement aussi. 
+                // Pour simplifier l'affichage immédiat :
+                 // On attend le retour serveur pour valider le tour normalement, 
+                 // mais ici on envoie juste l'event. 
+                 // Voir `receive_move` ci-dessous.
+            }
+        }
+        // Patch rapide pour Morpion : on doit savoir qui joue X ou O.
+        // Pour simplifier ce code "tout-en-un", on va juste afficher le symbole quand on reçoit le coup.
+        
+        // MAJ Morpion (simplifiée pour tenir dans un seul fichier) :
+        // Le serveur envoie receive_move à l'adversaire.
+        // Pour soi-même, on met à jour direct pour la fluidité si on veut, 
+        // mais le mieux est d'avoir la logique complète. 
+        // Ici, j'ajoute une petite logique locale pour l'UX.
+        let myTurn = false; 
+        let mySym = "X"; // Défaut
+        
+        socket.on('start_duel', d => {
+            // ... (code existant)
+            myTurn = d.turn;
+            mySym = d.sym;
+        });
+
+        // Morpion Override
+        window.playTic = function(idx) {
+            if(!myTurn || !currentRoom) return;
+            const cell = document.querySelectorAll('.cell')[idx];
+            if(cell.innerText !== "") return;
+            
+            cell.innerText = mySym;
+            myTurn = false;
+            document.getElementById('m-status').innerText = "Tour adverse...";
+            socket.emit('coup_morpion', { room: currentRoom, index: idx, sym: mySym });
+        };
+
+        socket.on('receive_move', d => {
+            const cell = document.querySelectorAll('.cell')[d.index];
+            cell.innerText = d.sym;
+            myTurn = true;
+            document.getElementById('m-status').innerText = "C'est ton tour !";
+            playSound('pop');
+        });
+
+        // Shifumi
+        function playS(move) {
+            if(!currentRoom) return;
+            document.getElementById('s-status').innerText = "Choix envoyé : " + move + ". Attente...";
+            socket.emit('coup_shifumi', { room: currentRoom, move: move });
+        }
+
+        socket.on('resultat_shifumi', d => {
+            let p1 = (socket.id === d.p1) ? d.m1 : d.m2; // Moi
+            let p2 = (socket.id === d.p1) ? d.m2 : d.m1; // Lui
+            alert(`Toi: ${p1} \nLui: ${p2}`);
+            document.getElementById('s-status').innerText = "Rejouez !";
+        });
+
+        // --- PAINT OPTIMISÉ ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false, lastX=0, lastY=0, color='black';
+
+        function initPaint() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 4;
+        }
+        
+        function setC(c, el) { 
+            color = c; 
+            document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
+            el.classList.add('active');
+        }
+        
+        function getPos(e) {
+            const r = canvas.getBoundingClientRect();
+            return {
+                x: (e.clientX || e.touches[0].clientX) - r.left,
+                y: (e.clientY || e.touches[0].clientY) - r.top
+            };
+        }
+
+        const startDraw = e => { drawing=true; const p=getPos(e); lastX=p.x; lastY=p.y; };
+        const moveDraw = e => {
+            if(!drawing) return;
+            e.preventDefault();
+            const p = getPos(e);
+            ctx.beginPath(); ctx.strokeStyle = color;
+            ctx.moveTo(lastX, lastY); ctx.lineTo(p.x, p.y); ctx.stroke();
+            socket.emit('draw_data', {x1:lastX, y1:lastY, x2:p.x, y2:p.y, c:color, w:4});
+            lastX=p.x; lastY=p.y;
+        };
+
+        canvas.addEventListener('mousedown', startDraw);
+        canvas.addEventListener('mousemove', moveDraw);
+        window.addEventListener('mouseup', () => drawing=false);
+        canvas.addEventListener('touchstart', startDraw, {passive:false});
+        canvas.addEventListener('touchmove', moveDraw, {passive:false});
+        canvas.addEventListener('touchend', () => drawing=false);
 
         socket.on('draw_remote', d => {
-            ctx.beginPath(); ctx.moveTo(d.x1, d.y1); ctx.lineTo(d.x2, d.y2); ctx.stroke();
+            ctx.beginPath(); ctx.strokeStyle = d.c; ctx.lineWidth = d.w;
+            ctx.moveTo(d.x1, d.y1); ctx.lineTo(d.x2, d.y2); ctx.stroke();
         });
-
+        
         function clearC() { ctx.clearRect(0,0,canvas.width,canvas.height); socket.emit('clear_canvas'); }
         socket.on('canvas_cleared', () => ctx.clearRect(0,0,canvas.width,canvas.height));
+
+        // --- TCHAT ---
+        function toggleChat() { document.getElementById('chat-panel').classList.toggle('open'); }
+        function send() {
+            const i = document.getElementById('chat-i');
+            if(i.value) { socket.emit('msg', {m: i.value}); i.value=""; }
+        }
+        socket.on('new_msg', d => {
+            const b = document.getElementById('msgs');
+            b.innerHTML += `<div class="msg"><b style="color:var(--accent)">${d.p}:</b> ${d.m}</div>`;
+            b.scrollTop = b.scrollHeight;
+            if(document.getElementById('chat-panel').classList.contains('open') === false) playSound('notif');
+        });
+
+        // --- SON ---
+        function playSound(type) {
+            // Un petit bip simple avec l'API AudioContext pour éviter de charger des fichiers mp3
+            const a = new (window.AudioContext || window.webkitAudioContext)();
+            const o = a.createOscillator();
+            const g = a.createGain();
+            o.connect(g); g.connect(a.destination);
+            if(type==='pop') o.frequency.value = 600;
+            else o.frequency.value = 400;
+            g.gain.value = 0.1;
+            o.start(); o.stop(a.currentTime + 0.1);
+        }
     </script>
 </body>
 </html>
