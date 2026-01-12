@@ -1,10 +1,10 @@
 import os, uuid
-from flask import Flask, send_file, request
+from flask import Flask, send_file, request  # <-- L'import important est ici
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sorek_secret_key'
-# Augmentation de la taille du buffer pour le Paint
+# On autorise plus de données pour que le Paint soit fluide
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet', max_http_buffer_size=1e7)
 
 users = {} 
@@ -16,7 +16,6 @@ def index():
 
 @socketio.on('join')
 def on_join(data):
-    # Correction : request.sid est accessible ici car on a importé request
     users[request.sid] = {
         'pseudo': data.get('pseudo', 'Anonyme'), 
         'device': data.get('device', 'desktop'), 
@@ -57,7 +56,7 @@ def accept(data):
         if gtype == "Shifumi": 
             shifumi_data[rid] = {}
         emit('start_duel', {'room': rid, 'game': gtype, 'opp': users[p2]['pseudo'], 'turn': True, 'sym': 'X'}, room=p1)
-        emit('start_duel', {'room': rid, 'game': gtype, 'opp': users[p1]['pseudo'], 'turn': False, 'sym': 'O'}, room=p2)
+        emit('start_duel', {'room': rid, 'game': gtype, 'opp': users[1]['pseudo'], 'turn': False, 'sym': 'O'}, room=p2)
         emit('update_users', users, broadcast=True)
 
 @socketio.on('coup_morpion')
@@ -82,11 +81,10 @@ def quit_d(data):
     rid = data.get('room')
     if rid:
         emit('fin_duel', room=rid)
-        # On remet les joueurs en mode Accueil
-        for sid in list(users.keys()):
-            if users[sid]['room'] == rid:
-                users[sid]['room'] = None
-                users[sid]['activity'] = '🏠 Accueil'
+        for sid, info in list(users.items()):
+            if info['room'] == rid:
+                info['room'] = None
+                info['activity'] = '🏠 Accueil'
         if rid in shifumi_data:
             del shifumi_data[rid]
         emit('update_users', users, broadcast=True)
@@ -107,3 +105,4 @@ def msg(data):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port)
+
