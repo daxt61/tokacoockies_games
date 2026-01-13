@@ -1,27 +1,20 @@
-import os, uuid, sqlite3
+import os, uuid
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_bcrypt import Bcrypt
+from supabase import create_client, Client
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'sorek_hub_2026_secret'
+app.config['SECRET_KEY'] = 'sorek_cloud_secure_2026'
 bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Initialisation de la Base de Données
-def init_db():
-    with sqlite3.connect('users.db') as conn:
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS users 
-                     (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                      pseudo TEXT UNIQUE NOT NULL, 
-                      password TEXT NOT NULL, 
-                      clicks INTEGER DEFAULT 0,
-                      multiplier INTEGER DEFAULT 1)''')
-        conn.commit()
+# --- CONFIGURATION SUPABASE ---
+SUPABASE_URL = "https://VOTRE_ID_PROJET.supabase.co"
+SUPABASE_KEY = "VOTRE_CLE_SERVICE_ROLE"
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-init_db()
-connected_users = {} # sid: {pseudo, room, mult}
+connected_users = {} # sid: {pseudo, mult, room}
 
 @app.route('/')
 def index():
@@ -31,65 +24,76 @@ def index():
 @socketio.on('login_action')
 def auth_logic(data):
     p, pwd, type_auth = data['pseudo'].strip(), data['password'], data['type']
-    if len(p) < 2 or len(pwd) < 4:
-        return emit('auth_error', "Identifiants trop courts !")
+    
+    # Chercher l'utilisateur
+    res = supabase.table("users").select("*").eq("pseudo", p).execute()
+    user = res.data[0] if res.data else None
 
-    with sqlite3.connect('users.db') as conn:
-        conn.row_factory = sqlite3.Row
-        user = conn.execute("SELECT * FROM users WHERE pseudo = ?", (p,)).fetchone()
+    if type_auth == 'register':
+        if user: return emit('auth_error', "Ce pseudo existe déjà !")
+        hash_pw = bcrypt.generate_password_hash(pwd).decode('utf-8')
+        supabase.table("users").insert({"pseudo": p, "password": hash_pw}).execute()
+        # Récupérer après insertion
+        res = supabase.table("users").select("*").eq("pseudo", p).execute()
+        user = res.data[0]
 
-        if type_auth == 'register':
-            if user: return emit('auth_error', "Pseudo déjà pris !")
-            hash_pw = bcrypt.generate_password_hash(pwd).decode('utf-8')
-            conn.execute("INSERT INTO users (pseudo, password) VALUES (?, ?)", (p, hash_pw))
-            conn.commit()
-            user = conn.execute("SELECT * FROM users WHERE pseudo = ?", (p,)).fetchone()
+    if user and bcrypt.check_password_hash(user['password'], pwd):
+        connected_users[request.sid] = {'pseudo': p, 'mult': user['multiplier'], 'room': None}
+        emit('login_ok', {
+            'pseudo': p, 
+            'clicks': user['clicks'], 
+            'mult': user['multiplier']
+        })
+        broadcast_global_data()
+    else:
+        emit('auth_error', "Identifiants invalides.")
 
-        if user and bcrypt.check_password_hash(user['password'], pwd):
-            connected_users[request.sid] = {'pseudo': p, 'room': None, 'mult': user['multiplier']}
-            emit('login_ok', {'pseudo': p, 'clicks': user['clicks'], 'mult': user['multiplier']})
-            broadcast_global_data()
-        else:
-            emit('auth_error', "Pseudo ou mot de passe incorrect.")
-
-# --- CLICKER & LEADERBOARD LIVE ---
+# --- CLICKER LOGIC (CLOUD) ---
 @socketio.on('add_click')
 def add_click():
     if request.sid in connected_users:
-        p = connected_users[request.sid]['pseudo']
-        with sqlite3.connect('users.db') as conn:
-            conn.execute("UPDATE users SET clicks = clicks + multiplier WHERE pseudo = ?", (p,))
-            conn.commit()
-            res = conn.execute("SELECT clicks FROM users WHERE pseudo = ?", (p,)).fetchone()
-            emit('update_score', {'clicks': res[0]})
+        u_info = connected_users[request.sid]
+        p = u_info['pseudo']
+        
+        # Récupérer score actuel et ajouter multiplier
+        res = supabase.table("users").select("clicks").eq("pseudo", p).execute()
+        new_total = res.data[0]['clicks'] + u_info['mult']
+        
+        # Sauvegarde immédiate dans le cloud
+        supabase.table("users").update({"clicks": new_total}).eq("pseudo", p).execute()
+        
+        emit('update_score', {'clicks': new_total})
         broadcast_leaderboard()
 
 @socketio.on('buy_upgrade')
 def buy_up():
     if request.sid in connected_users:
         p = connected_users[request.sid]['pseudo']
-        with sqlite3.connect('users.db') as conn:
-            u = conn.execute("SELECT clicks, multiplier FROM users WHERE pseudo = ?", (p,)).fetchone()
-            cost = u[1] * 100
-            if u[0] >= cost:
-                conn.execute("UPDATE users SET clicks = clicks - ?, multiplier = multiplier + 1 WHERE pseudo = ?", (cost, p))
-                conn.commit()
-                res = conn.execute("SELECT clicks, multiplier FROM users WHERE pseudo = ?", (p,)).fetchone()
-                connected_users[request.sid]['mult'] = res[1]
-                emit('login_ok', {'pseudo': p, 'clicks': res[0], 'mult': res[1]})
-        broadcast_leaderboard()
+        res = supabase.table("users").select("clicks", "multiplier").eq("pseudo", p).execute()
+        user_data = res.data[0]
+        
+        cost = user_data['multiplier'] * 100
+        if user_data['clicks'] >= cost:
+            new_mult = user_data['multiplier'] + 1
+            new_clicks = user_data['clicks'] - cost
+            
+            supabase.table("users").update({"clicks": new_clicks, "multiplier": new_mult}).eq("pseudo", p).execute()
+            
+            connected_users[request.sid]['mult'] = new_mult
+            emit('login_ok', {'pseudo': p, 'clicks': new_clicks, 'mult': new_mult})
+            broadcast_leaderboard()
 
+# --- LIVE UPDATES ---
 def broadcast_leaderboard():
-    with sqlite3.connect('users.db') as conn:
-        lb = conn.execute("SELECT pseudo, clicks FROM users ORDER BY clicks DESC LIMIT 10").fetchall()
-        emit('update_leaderboard', {'lb': [{"p": r[0], "c": r[1]} for r in lb]}, broadcast=True)
+    res = supabase.table("users").select("pseudo", "clicks").order("clicks", desc=True).limit(10).execute()
+    emit('update_leaderboard', {'lb': [{"p": r['pseudo'], "c": r['clicks']} for r in res.data]}, broadcast=True)
 
 def broadcast_global_data():
     broadcast_leaderboard()
     users_list = {sid: u['pseudo'] for sid, u in connected_users.items()}
     emit('update_users_list', {'users': users_list}, broadcast=True)
 
-# --- TCHAT & DEFIS ---
+# --- TCHAT & MORPION (IDENTIQUE) ---
 @socketio.on('msg')
 def chat(data):
     if request.sid in connected_users:
@@ -97,9 +101,8 @@ def chat(data):
 
 @socketio.on('send_defi')
 def defi(data):
-    target = data['target_sid']
-    if target in connected_users:
-        emit('receive_defi', {'from_sid': request.sid, 'from_name': connected_users[request.sid]['pseudo']}, room=target)
+    if data['target_sid'] in connected_users:
+        emit('receive_defi', {'from_sid': request.sid, 'from_name': connected_users[request.sid]['pseudo']}, room=data['target_sid'])
 
 @socketio.on('accept_defi')
 def accept(data):
