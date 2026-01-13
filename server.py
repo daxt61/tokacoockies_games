@@ -10,8 +10,8 @@ bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- CONFIGURATION SUPABASE ---
-SUPABASE_URL = "https://VOTRE_ID_PROJET.supabase.co"
-SUPABASE_KEY = "VOTRE_CLE_SERVICE_ROLE"
+SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
+SUPABASE_KEY = "9MjZLGabGOUWEZuo"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 connected_users = {} # sid: {pseudo, mult, room}
@@ -125,3 +125,4 @@ def disc():
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+
