@@ -3,3 +3,4 @@ flask-socketio
 eventlet
 gunicorn
 flask-bcrypt
+supabase
