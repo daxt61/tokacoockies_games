@@ -5,7 +5,7 @@ from flask_bcrypt import Bcrypt
 from supabase import create_client, Client
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'sorek_cloud_secure_2026'
+app.config['SECRET_KEY'] = 'sorek_cloud_2026_final'
 bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
@@ -24,8 +24,6 @@ def index():
 @socketio.on('login_action')
 def auth_logic(data):
     p, pwd, type_auth = data['pseudo'].strip(), data['password'], data['type']
-    
-    # Chercher l'utilisateur
     res = supabase.table("users").select("*").eq("pseudo", p).execute()
     user = res.data[0] if res.data else None
 
@@ -33,35 +31,24 @@ def auth_logic(data):
         if user: return emit('auth_error', "Ce pseudo existe déjà !")
         hash_pw = bcrypt.generate_password_hash(pwd).decode('utf-8')
         supabase.table("users").insert({"pseudo": p, "password": hash_pw}).execute()
-        # Récupérer après insertion
         res = supabase.table("users").select("*").eq("pseudo", p).execute()
         user = res.data[0]
 
     if user and bcrypt.check_password_hash(user['password'], pwd):
         connected_users[request.sid] = {'pseudo': p, 'mult': user['multiplier'], 'room': None}
-        emit('login_ok', {
-            'pseudo': p, 
-            'clicks': user['clicks'], 
-            'mult': user['multiplier']
-        })
+        emit('login_ok', {'pseudo': p, 'clicks': user['clicks'], 'mult': user['multiplier']})
         broadcast_global_data()
     else:
         emit('auth_error', "Identifiants invalides.")
 
-# --- CLICKER LOGIC (CLOUD) ---
+# --- CLICKER & LEADERBOARD ---
 @socketio.on('add_click')
 def add_click():
     if request.sid in connected_users:
-        u_info = connected_users[request.sid]
-        p = u_info['pseudo']
-        
-        # Récupérer score actuel et ajouter multiplier
-        res = supabase.table("users").select("clicks").eq("pseudo", p).execute()
-        new_total = res.data[0]['clicks'] + u_info['mult']
-        
-        # Sauvegarde immédiate dans le cloud
-        supabase.table("users").update({"clicks": new_total}).eq("pseudo", p).execute()
-        
+        u = connected_users[request.sid]
+        res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
+        new_total = res.data[0]['clicks'] + u['mult']
+        supabase.table("users").update({"clicks": new_total}).eq("pseudo", u['pseudo']).execute()
         emit('update_score', {'clicks': new_total})
         broadcast_leaderboard()
 
@@ -70,20 +57,16 @@ def buy_up():
     if request.sid in connected_users:
         p = connected_users[request.sid]['pseudo']
         res = supabase.table("users").select("clicks", "multiplier").eq("pseudo", p).execute()
-        user_data = res.data[0]
-        
-        cost = user_data['multiplier'] * 100
-        if user_data['clicks'] >= cost:
-            new_mult = user_data['multiplier'] + 1
-            new_clicks = user_data['clicks'] - cost
-            
+        u_data = res.data[0]
+        cost = u_data['multiplier'] * 100
+        if u_data['clicks'] >= cost:
+            new_mult = u_data['multiplier'] + 1
+            new_clicks = u_data['clicks'] - cost
             supabase.table("users").update({"clicks": new_clicks, "multiplier": new_mult}).eq("pseudo", p).execute()
-            
             connected_users[request.sid]['mult'] = new_mult
             emit('login_ok', {'pseudo': p, 'clicks': new_clicks, 'mult': new_mult})
             broadcast_leaderboard()
 
-# --- LIVE UPDATES ---
 def broadcast_leaderboard():
     res = supabase.table("users").select("pseudo", "clicks").order("clicks", desc=True).limit(10).execute()
     emit('update_leaderboard', {'lb': [{"p": r['pseudo'], "c": r['clicks']} for r in res.data]}, broadcast=True)
@@ -93,7 +76,7 @@ def broadcast_global_data():
     users_list = {sid: u['pseudo'] for sid, u in connected_users.items()}
     emit('update_users_list', {'users': users_list}, broadcast=True)
 
-# --- TCHAT & MORPION (IDENTIQUE) ---
+# --- CHAT & JEUX (CORRIGÉ SANS RELOAD) ---
 @socketio.on('msg')
 def chat(data):
     if request.sid in connected_users:
@@ -117,6 +100,13 @@ def accept(data):
 def g_move(data):
     emit('opp_move', data, room=data['room'], include_self=False)
 
+@socketio.on('quitter_jeu')
+def quitter(data):
+    rid = data.get('room')
+    if rid:
+        emit('fin_duel', room=rid)
+        leave_room(rid)
+
 @socketio.on('disconnect')
 def disc():
     if request.sid in connected_users:
@@ -125,4 +115,3 @@ def disc():
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
-
