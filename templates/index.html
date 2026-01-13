@@ -3,152 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sorek ClickWars Mobile</title>
+    <title>Sorek Hub Mobile</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         :root { --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --border: #30363d; --red: #f85149; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { background: var(--bg); color: #c9d1d9; font-family: sans-serif; margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-
-        /* AUTH */
+        
         #auth-overlay { position: fixed; inset: 0; background: #000; z-index: 3000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .auth-box { background: var(--panel); padding: 25px; border-radius: 15px; border: 1px solid var(--accent); width: 100%; max-width: 350px; text-align: center; }
+        .auth-box { background: var(--panel); padding: 25px; border-radius: 15px; border: 1px solid var(--accent); width: 100%; max-width: 350px; }
 
-        /* HEADER SCORE */
-        header { padding: 15px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        #score-val { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
-
-        /* MAIN CONTENT AREA */
-        main { flex: 1; position: relative; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-        .view { display: none; width: 100%; height: 100%; padding: 20px; }
+        header { padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; }
+        main { flex: 1; position: relative; overflow-y: auto; }
+        .view { display: none; padding: 20px; height: 100%; }
         .view.active { display: block; }
 
-        /* CLICKER VIEW */
-        #click-area { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: space-around; height: 100%; }
-        #btn-clicker { width: 180px; height: 180px; border-radius: 50%; border: 10px solid var(--accent); background: var(--panel); font-size: 4rem; cursor: pointer; transition: 0.1s; display: flex; align-items: center; justify-content: center; }
+        #btn-clicker { width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--accent); background: var(--panel); font-size: 4rem; cursor: pointer; transition: 0.1s; display: flex; align-items: center; justify-content: center; margin: 20px auto; color: white; }
         #btn-clicker:active { transform: scale(0.9); }
-        
-        /* CLASSEMENT RELATIF (À CÔTÉ DU BOUTON) */
-        #relative-lb { width: 100%; max-width: 300px; background: rgba(0,0,0,0.3); border-radius: 10px; padding: 10px; font-size: 0.8rem; margin-top: 20px; }
-        .lb-row { display: flex; justify-content: space-between; padding: 4px; border-radius: 4px; }
-        .is-me { background: var(--accent); color: white; font-weight: bold; }
 
-        /* NAVBAR MOBILE */
-        nav { height: 65px; background: var(--panel); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; color: #8b949e; cursor: pointer; }
+        #relative-lb { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px; font-size: 0.8rem; width: 100%; max-width: 300px; margin: 0 auto; }
+        .lb-row { display: flex; justify-content: space-between; padding: 4px; }
+        .is-me { color: var(--accent); font-weight: bold; border-left: 3px solid var(--accent); padding-left: 5px; }
+
+        nav { height: 70px; background: var(--panel); border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; }
+        .nav-item { font-size: 0.7rem; color: #8b949e; text-align: center; cursor: pointer; }
         .nav-item.active { color: var(--accent); }
-        .nav-item i { font-size: 1.2rem; margin-bottom: 4px; }
 
-        /* GUILDE / LB LISTS */
-        .list-item { background: var(--panel); padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); }
-        .btn { background: var(--accent); border: none; padding: 10px 15px; color: white; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .btn-red { background: var(--red); }
-        input { background: #000; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 6px; width: 100%; margin: 10px 0; }
+        .btn { background: var(--accent); border: none; padding: 12px; color: white; border-radius: 8px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 10px; }
+        input { background: #000; border: 1px solid var(--border); color: white; padding: 12px; border-radius: 8px; width: 100%; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h2 style="color:var(--accent)">SOREK HUB V5</h2>
-            <div id="auth-err" style="color:var(--red); font-size:0.8rem; margin-bottom:10px;"></div>
+            <h2 style="text-align:center; color:var(--accent)">SOREK HUB V5</h2>
+            <p id="auth-err" style="color:var(--red); text-align:center; font-size:0.8rem;"></p>
             <input id="u" placeholder="Pseudo">
             <input id="p" type="password" placeholder="Mot de passe">
-            <button class="btn" style="width:100%" onclick="auth('login')">CONNEXION</button>
-            <button class="btn" style="width:100%; background:none; color:var(--accent); margin-top:10px" onclick="auth('register')">S'INSCRIRE</button>
+            <button class="btn" onclick="auth('login')">CONNEXION</button>
+            <button class="btn" style="background:none; border:1px solid var(--accent); color:var(--accent)" onclick="auth('register')">S'INSCRIRE</button>
         </div>
     </div>
 
     <header>
-        <div><span id="score-val">0</span> 💰</div>
-        <div id="guild-name-tag" style="font-size:0.8rem; color:var(--accent)">Pas de guilde</div>
+        <div id="score-val" style="font-weight:bold; color:var(--accent); font-size:1.2rem;">0 💰</div>
+        <div id="guild-tag" style="font-size:0.8rem; opacity:0.7;">Sans Guilde</div>
     </header>
 
     <main>
-        <div id="view-clicker" class="view active">
-            <div id="click-area">
-                <div id="mult-val">Puissance: x1</div>
-                <button id="btn-clicker" onclick="clickAction()">👆</button>
-                
-                <div id="relative-lb">
-                    <div style="text-align:center; font-weight:bold; margin-bottom:5px;">CLASSEMENT PROCHE</div>
-                    <div id="rel-rows"></div>
-                </div>
-                
-                <button class="btn" onclick="socket.emit('buy_upgrade')">Améliorer (💰 <span id="cost-val">100</span>)</button>
+        <div id="view-clicker" class="view active" style="text-align:center">
+            <div id="mult-val" style="font-size:0.9rem">Puissance: x1</div>
+            <button id="btn-clicker" onclick="clickAction()">👆</button>
+            <div id="relative-lb">
+                <div style="font-weight:bold; margin-bottom:5px;">CLASSEMENT PROCHE</div>
+                <div id="rel-rows"></div>
             </div>
+            <button class="btn" style="max-width:250px" onclick="socket.emit('buy_upgrade')">Améliorer (💰 <span id="cost-val">100</span>)</button>
         </div>
 
         <div id="view-lb" class="view">
             <h3>🏆 CLASSEMENTS</h3>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <button class="btn" onclick="toggleLB('users')" id="btn-lb-u">Joueurs</button>
-                <button class="btn" onclick="toggleLB('guilds')" id="btn-lb-g">Guildes</button>
-            </div>
-            <div id="full-lb-list"></div>
+            <div id="lb-content">Chargement...</div>
         </div>
 
         <div id="view-guild" class="view">
             <h3>🛡️ GUILDE</h3>
-            <div id="guild-manager">
-                <input id="g-name" placeholder="Nom de la guilde">
-                <button class="btn" onclick="createGuild()">Créer ma Guilde</button>
-                <hr style="border:0; border-top:1px solid var(--border); margin:20px 0;">
-                <p>Traître ? Tu perdras tout ton score.</p>
-                <button class="btn btn-red" onclick="trahir()">TRAHIR MA GUILDE</button>
-            </div>
+            <input id="g-name" placeholder="Nom de la guilde">
+            <button class="btn" onclick="socket.emit('create_guild', {name: document.getElementById('g-name').value})">CRÉER GUILDE</button>
+            <p style="margin-top:40px; color:var(--red); font-size:0.8rem">Zone de trahison : tu perdras tous tes clics.</p>
+            <button class="btn" style="background:var(--red)" onclick="if(confirm('Tout perdre?')) socket.emit('trahir_guilde')">TRAHIR</button>
         </div>
 
         <div id="view-chat" class="view">
-            <h3>💬 TCHAT GLOBAL</h3>
-            <div id="chat-msgs" style="height:300px; overflow-y:auto; background:#000; padding:10px; border-radius:8px;"></div>
+            <h3>💬 CHAT GLOBAL</h3>
+            <div id="chat-msgs" style="height:250px; overflow-y:auto; background:rgba(0,0,0,0.3); padding:10px; border-radius:10px;"></div>
             <div style="display:flex; margin-top:10px;">
                 <input id="mi" placeholder="Message..." style="margin:0; flex:1;">
-                <button class="btn" onclick="sendMsg()">➤</button>
+                <button class="btn" style="width:60px; margin:0; margin-left:5px;" onclick="sendMsg()">OK</button>
             </div>
         </div>
     </main>
 
     <nav>
-        <div class="nav-item active" onclick="showView('clicker', this)"><i>🖱️</i>Click</div>
-        <div class="nav-item" onclick="showView('lb', this); socket.emit('get_full_lb')"><i>🏆</i>Rangs</div>
-        <div class="nav-item" onclick="showView('guild', this)"><i>🛡️</i>Guilde</div>
-        <div class="nav-item" onclick="showView('chat', this)"><i>💬</i>Chat</div>
+        <div class="nav-item active" onclick="showView('clicker', this)">🏠<br>Click</div>
+        <div class="nav-item" onclick="showView('lb', this); socket.emit('get_full_lb')">🏆<br>Rangs</div>
+        <div class="nav-item" onclick="showView('guild', this)">🛡️<br>Guilde</div>
+        <div class="nav-item" onclick="showView('chat', this)">💬<br>Chat</div>
     </nav>
 
     <script>
         const socket = io();
         let myP = "";
-        let emojis = ["👆", "🔥", "💎", "⭐", "🚀", "👑", "🍀", "👻", "👽", "🤖"];
+        let emos = ["👆", "🔥", "💎", "⭐", "🚀", "👑", "🍀", "👻", "👽", "🤖"];
 
-        function auth(t) { socket.emit('login_action', {pseudo: document.getElementById('u').value, password: document.getElementById('p').value, type: t}); }
+        function auth(t) {
+            socket.emit('login_action', {pseudo: document.getElementById('u').value, password: document.getElementById('p').value, type: t});
+        }
 
         socket.on('login_ok', d => {
             myP = d.pseudo;
             document.getElementById('auth-overlay').style.display = 'none';
-            document.getElementById('score-val').innerText = d.clicks;
+            document.getElementById('score-val').innerText = d.clicks + " 💰";
             document.getElementById('mult-val').innerText = "Puissance: x" + d.mult;
             document.getElementById('cost-val').innerText = d.mult * 100;
-            document.getElementById('guild-name-tag').innerText = d.guild || "Sans Guilde";
+            document.getElementById('guild-tag').innerText = d.guild || "Sans Guilde";
             updateEmoji(d.clicks);
         });
 
         socket.on('auth_error', m => document.getElementById('auth-err').innerText = m);
-        socket.on('notif', m => alert(m));
 
         function clickAction() {
             socket.emit('add_click');
-            updateEmoji(parseInt(document.getElementById('score-val').innerText));
+            let s = parseInt(document.getElementById('score-val').innerText);
+            updateEmoji(s);
         }
 
-        socket.on('update_score', d => document.getElementById('score-val').innerText = d.clicks);
+        socket.on('update_score', d => document.getElementById('score-val').innerText = d.clicks + " 💰");
 
-        function updateEmoji(score) {
-            let idx = Math.floor(score / 500) % emojis.length;
-            document.getElementById('btn-clicker').innerText = emojis[idx];
+        function updateEmoji(s) {
+            let i = Math.floor(s / 500) % emos.length;
+            document.getElementById('btn-clicker').innerText = emos[i];
         }
 
-        // NAVIGATION
         function showView(id, el) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -156,60 +132,31 @@
             el.classList.add('active');
         }
 
-        // RELATIVE LB (DANS LE CLICKER)
         socket.on('relative_lb', d => {
-            const container = document.getElementById('rel-rows');
-            container.innerHTML = d.lb.map((u, i) => `
+            document.getElementById('rel-rows').innerHTML = d.lb.map(u => `
                 <div class="lb-row ${u.pseudo === myP ? 'is-me' : ''}">
-                    <span>${u.pseudo}</span>
-                    <span>${u.clicks}</span>
+                    <span>${u.pseudo}</span><span>${u.clicks}</span>
                 </div>
             `).join('');
         });
 
-        // FULL CLASSEMENTS
-        let currentLBData = null;
         socket.on('full_lb_data', d => {
-            currentLBData = d;
-            toggleLB('users');
+            let h = "<h4>TOP JOUEURS</h4>";
+            d.users.forEach((u, i) => h += `<div style="font-size:0.8rem">#${i+1} ${u.pseudo}: ${u.clicks}</div>`);
+            h += "<h4 style='margin-top:20px'>TOP GUILDES</h4>";
+            d.guilds.forEach((g, i) => h += `<div style="font-size:0.8rem">#${i+1} ${g.name}: ${g.total_clicks}</div>`);
+            document.getElementById('lb-content').innerHTML = h;
         });
 
-        function toggleLB(type) {
-            const list = document.getElementById('full-lb-list');
-            list.innerHTML = "";
-            let data = type === 'users' ? currentLBData.users : currentLBData.guilds;
-            data.forEach((item, i) => {
-                list.innerHTML += `<div class="list-item">
-                    <b>#${i+1} ${item.pseudo || item.name}</b><br>
-                    Score: ${item.clicks || item.total_clicks}
-                    ${type === 'guilds' ? `<button class="btn" style="float:right" onclick="joinGuild('${item.name}')">Join</button>` : ''}
-                </div>`;
-            });
-        }
-
-        // GUILDES
-        function createGuild() { socket.emit('create_guild', {name: document.getElementById('g-name').value}); }
-        function joinGuild(name) { socket.emit('join_guild_request', {guild: name}); }
-        function trahir() { if(confirm("VRAIMENT ? Tu perdras TOUT ton score !")) socket.emit('trahir_guilde'); }
-
-        socket.on('guild_request', d => {
-            if(confirm(`${d.from} veut rejoindre ta guilde !`)) {
-                socket.emit('answer_guild', {user: d.from, accept: true});
-            } else {
-                socket.emit('answer_guild', {user: d.from, accept: false});
-            }
-        });
-
-        // CHAT
-        function sendMsg() { 
-            let i = document.getElementById('mi'); 
-            if(i.value) socket.emit('msg', {m: i.value}); 
-            i.value = ""; 
+        function sendMsg() {
+            let i = document.getElementById('mi');
+            if(i.value) socket.emit('msg', {m: i.value});
+            i.value = "";
         }
         socket.on('new_msg', d => {
-            const box = document.getElementById('chat-msgs');
-            box.innerHTML += `<div><b>${d.p}:</b> ${d.m}</div>`;
-            box.scrollTop = box.scrollHeight;
+            const b = document.getElementById('chat-msgs');
+            b.innerHTML += `<div style="margin-bottom:5px"><b>${d.p}:</b> ${d.m}</div>`;
+            b.scrollTop = b.scrollHeight;
         });
     </script>
 </body>
