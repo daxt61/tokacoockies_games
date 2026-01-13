@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sorek Cloud Hub</title>
+    <title>Sorek Hub Cloud</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         :root { --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --border: #30363d; --red: #f85149; }
@@ -23,11 +23,11 @@
         #right-bar { width: 240px; background: #010409; border-left: 1px solid var(--border); padding: 15px; display: flex; flex-direction: column; }
         .lb-item { font-size: 0.85rem; padding: 8px; background: var(--panel); margin-bottom: 4px; border-radius: 4px; display: flex; justify-content: space-between; }
         
-        .ad-zone { margin-top: auto; background: #1b1f23; border: 1px dashed #444; height: 150px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--accent); text-align: center; }
+        .ad-zone { margin-top: auto; background: #1b1f23; border: 1px dashed #444; height: 150px; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: var(--accent); text-align: center; border-radius: 8px; }
 
-        #game-view { display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 1500; flex-direction: column; align-items: center; justify-content: center; }
+        #game-view { display:none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 1500; flex-direction: column; align-items: center; justify-content: center; }
         .grid { display: grid; grid-template-columns: repeat(3, 100px); gap: 10px; margin-top: 20px; }
-        .cell { width: 100px; height: 100px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; cursor: pointer; }
+        .cell { width: 100px; height: 100px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 2.5rem; cursor: pointer; border-radius: 8px; }
 
         input { background: #000; border: 1px solid var(--border); color: white; padding: 10px; border-radius: 6px; width: 100%; margin: 5px 0; box-sizing: border-box; }
         .btn { background: var(--accent); border: none; padding: 10px; color: white; border-radius: 6px; cursor: pointer; width: 100%; font-weight: bold; }
@@ -37,7 +37,7 @@
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h2 style="color:var(--accent)">SOREK CLOUD</h2>
+            <h2 style="color:var(--accent)">SOREK HUB</h2>
             <div id="auth-err" style="color:var(--red); font-size:0.75rem; margin-bottom:10px;"></div>
             <input id="u" placeholder="Pseudo">
             <input id="p" type="password" placeholder="Mot de passe">
@@ -53,7 +53,7 @@
             <input id="mi" placeholder="Message..." onkeypress="if(event.key==='Enter')sendMsg()">
         </div>
         <div style="padding:10px; font-weight:bold; font-size:0.8rem;">JOUEURS EN LIGNE</div>
-        <div id="users-list" style="padding:10px; overflow-y:auto;"></div>
+        <div id="users-list" style="padding:10px; overflow-y:auto; flex:0.5;"></div>
     </div>
 
     <div id="center">
@@ -66,17 +66,18 @@
     <div id="right-bar">
         <div style="font-weight:bold; margin-bottom:10px; color:var(--accent)">CLASSEMENT LIVE 🏆</div>
         <div id="leaderboard-box"></div>
-        <div class="ad-zone">ESPACE PUB<br>DISPONIBLE</div>
+        <div class="ad-zone">PUB : Sorek Hub 2026</div>
     </div>
 
     <div id="game-view">
         <h2 id="opp-name">Duel vs ...</h2>
+        <div id="game-status" style="color:var(--accent)">C'est ton tour !</div>
         <div class="grid">
             <div class="cell" onclick="makeMove(0)"></div><div class="cell" onclick="makeMove(1)"></div><div class="cell" onclick="makeMove(2)"></div>
             <div class="cell" onclick="makeMove(3)"></div><div class="cell" onclick="makeMove(4)"></div><div class="cell" onclick="makeMove(5)"></div>
             <div class="cell" onclick="makeMove(6)"></div><div class="cell" onclick="makeMove(7)"></div><div class="cell" onclick="makeMove(8)"></div>
         </div>
-        <button class="btn" style="width:120px; margin-top:20px; background:var(--red);" onclick="location.reload()">QUITTER</button>
+        <button class="btn" style="width:120px; margin-top:20px; background:var(--red);" onclick="fermerJeu()">QUITTER</button>
     </div>
 
     <script>
@@ -141,22 +142,48 @@
             b.scrollTop = b.scrollHeight;
         });
 
+        // --- JEU SANS RELOAD ---
         function sendDefi(sid) { socket.emit('send_defi', {target_sid: sid}); }
         socket.on('receive_defi', d => { if(confirm(`Défi de ${d.from_name} ?`)) socket.emit('accept_defi', {opp_sid: d.from_sid}); });
+        
         socket.on('start_game', d => {
             currentRoom = d.room; myTurn = d.turn;
             document.getElementById('game-view').style.display = 'flex';
             document.getElementById('opp-name').innerText = "Duel vs " + d.opp;
+            document.querySelectorAll('.cell').forEach(c => c.innerText = "");
+            updateStatus();
         });
+
         function makeMove(i) {
             if(!myTurn) return;
             const cells = document.querySelectorAll('.cell');
             if(cells[i].innerText === "") {
                 cells[i].innerText = "X"; myTurn = false;
                 socket.emit('game_move', {room: currentRoom, idx: i, sym: "X"});
+                updateStatus();
             }
         }
-        socket.on('opp_move', d => { document.querySelectorAll('.cell')[d.idx].innerText = "O"; myTurn = true; });
+
+        socket.on('opp_move', d => {
+            document.querySelectorAll('.cell')[d.idx].innerText = "O";
+            myTurn = true; updateStatus();
+        });
+
+        function updateStatus() {
+            document.getElementById('game-status').innerText = myTurn ? "À toi !" : "Attente...";
+        }
+
+        function fermerJeu() {
+            socket.emit('quitter_jeu', {room: currentRoom});
+            document.getElementById('game-view').style.display = 'none';
+            currentRoom = null;
+        }
+
+        socket.on('fin_duel', () => {
+            alert("Fin du match !");
+            document.getElementById('game-view').style.display = 'none';
+            currentRoom = null;
+        });
     </script>
 </body>
 </html>
