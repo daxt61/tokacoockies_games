@@ -433,21 +433,27 @@ def send_friend_request(data):
         target = data['target'].strip()
         pseudo = user_data['pseudo']
 
-        if target == pseudo:
-            return emit('error', "Tu ne peux pas t'ajouter toi-même")
+        # 1. Enregistrement en base
+        supabase.table("friendships").insert({
+            "user1": pseudo, 
+            "user2": target, 
+            "status": "accepted"
+        }).execute()
 
-        # Correction : ajout des guillemets pour que Supabase comprenne que c'est du texte
-        res = supabase.table("friendships").select("*").or_(f'and(user1.eq."{pseudo}",user2.eq."{target}"),and(user1.eq."{target}",user2.eq."{pseudo}")').execute()
-        
-        if res.data:
-            return emit('error', "Demande déjà existante ou déjà amis")
+        # 2. On met à jour TA liste
+        get_friends() 
 
-        supabase.table("friendships").insert({"user1": pseudo, "user2": target, "status": "accepted"}).execute()
-        emit('success', f"Demande envoyée à {target}")
+        # 3. ON CHERCHE LE DESTINATAIRE POUR METTRE À JOUR SA LISTE AUSSI
+        for sid, info in connected_users.items():
+            if info['pseudo'] == target:
+                # On force l'exécution de get_friends chez lui via son sid
+                socketio.emit('friends_list_trigger', {}, room=sid)
+                break
+                
+        emit('success', f"Ami ajouté : {target}")
     except Exception as e:
-        print(f"Erreur friend_request: {e}")
-        emit('error', "Utilisateur introuvable ou erreur serveur")
-
+        emit('error', "Erreur lors de l'ajout")
+        
 @socketio.on('get_friends')
 def get_friends():
     from flask import request
@@ -495,6 +501,7 @@ def on_disconnect():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
 
 
 
