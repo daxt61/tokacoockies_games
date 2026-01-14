@@ -3,210 +3,307 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sorek Hub V6 - Ultimate</title>
+    <title>Sorek Casino & Clicker</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        :root { --bg: #121212; --panel: #1e1e1e; --accent: #bb86fc; --gold: #ffd700; --green: #03dac6; --red: #cf6679; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { background: var(--bg); color: #e0e0e0; font-family: 'Fredoka', sans-serif; margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+        :root { --bg: #101010; --panel: #1a1a1a; --accent: #ffd700; --text: #fff; --green: #4caf50; --red: #f44336; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        
+        body { background: var(--bg); color: var(--text); margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
+
+        /* TOAST NOTIFICATIONS (Meilleures popups) */
+        #toast-container { position: fixed; top: 50px; left: 50%; transform: translateX(-50%); z-index: 5000; width: 90%; max-width: 350px; pointer-events: none; }
+        .toast { background: rgba(30,30,30,0.95); color: #fff; padding: 12px 20px; border-radius: 25px; margin-bottom: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); opacity: 0; transform: translateY(-20px); transition: 0.3s; border: 1px solid #333; font-weight: bold; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { border-color: var(--green); color: var(--green); }
+        .toast.error { border-color: var(--red); color: var(--red); }
 
         /* HEADER */
-        header { padding: 15px; background: var(--panel); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; padding-top: env(safe-area-inset-top, 15px); }
-        #rank-badge { font-size: 0.7rem; background: var(--accent); color: black; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 5px; }
+        header { padding: 15px; background: var(--panel); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-top: env(safe-area-inset-top, 20px); }
+        .badge { background: #333; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; color: var(--accent); }
 
         /* MAIN */
         main { flex: 1; overflow-y: auto; position: relative; }
-        .view { display: none; padding: 20px; animation: fadeIn 0.3s; }
+        .view { display: none; padding: 20px; animation: fadeUp 0.3s ease-out; height: 100%; }
         .view.active { display: block; }
-        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(15px); } to { opacity:1; transform:translateY(0); } }
 
-        /* CLICKER */
-        #btn-clicker { width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--accent); background: radial-gradient(circle, #333 0%, #1e1e1e 100%); font-size: 4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 20px auto; color: white; box-shadow: 0 0 25px rgba(187, 134, 252, 0.3); }
-        #btn-clicker:active { transform: scale(0.92); border-color: white; }
+        /* BUTTON CLICKER */
+        #clicker-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80%; }
+        #btn-clicker { 
+            width: 180px; height: 180px; border-radius: 50%; 
+            background: radial-gradient(circle, #2a2a2a, #000); 
+            border: 6px solid var(--accent); font-size: 5rem; 
+            cursor: pointer; box-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
+            transition: transform 0.05s; display: flex; align-items: center; justify-content: center;
+        }
+        #btn-clicker:active { transform: scale(0.92); border-color: #fff; }
+        .pulse-anim { animation: pulse 0.5s; }
+        @keyframes pulse { 0% {box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);} 70% {box-shadow: 0 0 0 20px rgba(0, 0, 0, 0);} 100% {box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);} }
 
         /* CASINO */
-        .slot-machine { background: #000; padding: 20px; border-radius: 15px; border: 4px solid var(--gold); text-align: center; margin-top: 20px; }
-        #slot-display { font-size: 3rem; margin: 20px 0; min-height: 60px; }
-        .btn-gold { background: var(--gold); color: black; }
-
-        /* FRIENDS */
-        .friend-item { display: flex; justify-content: space-between; background: #2c2c2c; padding: 10px; margin-bottom: 8px; border-radius: 8px; align-items: center; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
-        .online { background: var(--green); box-shadow: 0 0 5px var(--green); }
-        .offline { background: var(--red); }
+        .slot-machine { background: #000; padding: 20px; border-radius: 20px; border: 4px solid var(--accent); text-align: center; margin-top: 30px; box-shadow: inset 0 0 20px #000; }
+        .slots-window { display: flex; justify-content: center; gap: 10px; font-size: 3.5rem; background: #111; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; overflow: hidden; height: 100px; align-items: center; }
+        .slot-col { width: 60px; text-align: center; }
 
         /* UI ELEMENTS */
-        .btn { background: var(--accent); border: none; padding: 12px; color: black; border-radius: 8px; font-weight: 600; width: 100%; margin-top: 10px; font-family: inherit; }
-        input { background: #2c2c2c; border: 1px solid #444; color: white; padding: 12px; border-radius: 8px; width: 100%; margin-bottom: 10px; outline: none; }
+        .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; transition: 0.2s; }
+        .btn-primary { background: var(--accent); color: #000; }
+        .btn-primary:active { transform: scale(0.98); background: #e6c200; }
+        .btn-red { background: var(--red); color: white; }
+        
+        input { width: 100%; padding: 15px; background: #222; border: 1px solid #444; color: white; border-radius: 10px; margin-bottom: 10px; font-size: 1rem; outline: none; }
         input:focus { border-color: var(--accent); }
 
         /* NAVBAR */
-        nav { height: 70px; background: var(--panel); display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom, 5px); border-top: 1px solid #333; }
-        .nav-item { flex: 1; text-align: center; color: #888; font-size: 0.7rem; cursor: pointer; transition: 0.2s; }
-        .nav-item i { font-size: 1.4rem; display: block; margin-bottom: 3px; }
-        .nav-item.active { color: var(--accent); transform: translateY(-2px); }
+        nav { height: 75px; background: var(--panel); border-top: 1px solid #333; display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
+        .nav-item { text-align: center; font-size: 0.7rem; color: #666; transition: 0.2s; flex: 1; }
+        .nav-item i { display: block; font-size: 1.5rem; margin-bottom: 4px; }
+        .nav-item.active { color: var(--accent); transform: translateY(-3px); }
 
-        #auth-overlay { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; align-items: center; justify-content: center; }
-        .auth-box { background: var(--panel); padding: 30px; border-radius: 20px; width: 85%; max-width: 350px; text-align: center; border: 1px solid var(--accent); }
+        /* AUTH */
+        #auth-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .auth-box { width: 100%; max-width: 350px; background: #1a1a1a; padding: 30px; border-radius: 20px; border: 1px solid var(--accent); text-align: center; }
     </style>
 </head>
 <body>
 
+    <div id="toast-container"></div>
+
     <div id="auth-overlay">
         <div class="auth-box">
-            <h1 style="color:var(--accent); margin-top:0">SOREK HUB</h1>
-            <p id="auth-err" style="color:var(--red)"></p>
-            <input id="u" placeholder="Ton Pseudo">
+            <h1 style="color:var(--accent); margin-top:0">SOREK CASINO</h1>
+            <p id="auth-err" style="color:var(--red); font-size:0.9rem;"></p>
+            <input id="u" placeholder="Pseudo">
             <input id="p" type="password" placeholder="Mot de passe">
-            <button class="btn" onclick="auth('login')">JOUER</button>
+            <button class="btn btn-primary" onclick="auth('login')">JOUER</button>
             <button class="btn" style="background:transparent; color:var(--accent); border:1px solid var(--accent)" onclick="auth('register')">CRÉER COMPTE</button>
         </div>
     </div>
 
     <header>
         <div>
-            <span id="rank-badge">...</span>
-            <span id="score-val" style="font-weight:bold; font-size:1.2rem;">0</span> 💰
+            <div class="badge" id="rank-badge">Vagabond</div>
+            <div style="font-size:1.4rem; font-weight:bold; margin-top:2px;"><span id="score-val">0</span> 💰</div>
         </div>
-        <div id="guild-tag" style="font-size:0.8rem; color:#888;">Solo</div>
+        <div style="text-align:right">
+            <div style="font-size:0.8rem; color:#888;">Guilde</div>
+            <div style="color:var(--accent); font-weight:bold;" id="guild-tag">Aucune</div>
+        </div>
     </header>
 
     <main>
-        <div id="view-clicker" class="view active" style="text-align:center">
-            <button id="btn-clicker" onclick="clickAction()">👆</button>
-            <div style="background:#2c2c2c; padding:10px; border-radius:10px; margin:20px;">
-                <h4 style="margin:0 0 10px 0; color:#888">Classement Proche</h4>
-                <div id="rel-rows"></div>
+        <div id="view-clicker" class="view active">
+            <div id="clicker-container">
+                <button id="btn-clicker" onmousedown="clickAction()">👆</button>
+                <div style="margin-top:20px; text-align:center; width:100%">
+                    <div id="relative-lb-box" style="margin-bottom:20px; font-size:0.9rem; color:#888; background:#151515; padding:10px; border-radius:10px; max-width:300px; margin: 0 auto 20px auto;">
+                        Jouez pour voir le classement...
+                    </div>
+                    <button class="btn btn-primary" style="max-width:300px" onclick="buyUpgrade()">
+                        AMÉLIORER <br><small style="font-weight:normal">Coût: <span id="cost-val">100</span></small>
+                    </button>
+                </div>
             </div>
-            <button class="btn" onclick="socket.emit('buy_upgrade')">UPGRADE (Coût: <span id="cost-val">100</span>)</button>
         </div>
 
         <div id="view-casino" class="view">
-            <h2 style="text-align:center; color:var(--gold)">SOREK CASINO 🎰</h2>
+            <h2 style="text-align:center; color:var(--accent)">JACKPOT SLOTS</h2>
             <div class="slot-machine">
-                <div id="slot-display">🍒 🍒 🍒</div>
-                <p style="font-size:0.8rem; color:#888">Coût: 500 clics</p>
-                <button class="btn btn-gold" onclick="spinWheel()">LANCER (500💰)</button>
+                <div class="slots-window">
+                    <div class="slot-col" id="s1">🍒</div>
+                    <div class="slot-col" id="s2">🍒</div>
+                    <div class="slot-col" id="s3">🍒</div>
+                </div>
+                <p style="color:#888; font-size:0.9rem;">Mise: 500 💰 | Jackpot: x50</p>
+                <button class="btn btn-primary" onclick="spinCasino()" id="btn-spin">TOURNER (500)</button>
             </div>
-            <p id="casino-msg" style="text-align:center; margin-top:20px; font-weight:bold;"></p>
+            <div id="casino-result" style="text-align:center; margin-top:20px; font-weight:bold; height:20px;"></div>
         </div>
 
-        <div id="view-friends" class="view">
-            <h3>👥 MES AMIS</h3>
-            <div style="display:flex; gap:5px;">
-                <input id="friend-input" placeholder="Pseudo de l'ami...">
-                <button class="btn" style="width:60px; margin-top:0" onclick="addFriend()">+</button>
-            </div>
-            <div id="requests-box"></div>
-            <div id="friends-list" style="margin-top:20px;"></div>
-        </div>
-
-        <div id="view-chat" class="view">
-            <h3>💬 GLOBAL</h3>
-            <div id="chat-msgs" style="height:350px; overflow-y:auto; background:#000; padding:10px; border-radius:10px;"></div>
-            <div style="display:flex; margin-top:10px; gap:10px;">
-                <input id="mi" placeholder="Message..." style="margin:0;">
-                <button class="btn" style="width:60px; margin:0;" onclick="sendMsg()">➤</button>
-            </div>
+        <div id="view-social" class="view">
+            <h3 style="text-align:center">SOCIAL HUB</h3>
+            <p style="text-align:center; color:#666">Chat et Amis bientôt ici...</p>
         </div>
     </main>
 
     <nav>
-        <div class="nav-item active" onclick="showView('clicker', this)"><i>⚡</i>Click</div>
-        <div class="nav-item" onclick="showView('casino', this)"><i>🎰</i>Casino</div>
-        <div class="nav-item" onclick="showView('friends', this)"><i>👥</i>Amis</div>
-        <div class="nav-item" onclick="showView('chat', this)"><i>💬</i>Chat</div>
+        <div class="nav-item active" onclick="switchView('clicker', this)"><i>⚡</i>Click</div>
+        <div class="nav-item" onclick="switchView('casino', this)"><i>🎰</i>Casino</div>
+        <div class="nav-item" onclick="switchView('social', this)"><i>👥</i>Social</div>
     </nav>
 
     <script>
         const socket = io();
-        let myPseudo = "";
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let myMult = 1;
 
-        // AUTH
+        // --- SOUND ENGINE (Synthétiseur) ---
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            if (type === 'click') {
+                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+            } else if (type === 'coin') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1800, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+            } else if (type === 'spin') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+            } else if (type === 'win') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(500, audioCtx.currentTime);
+                osc.frequency.linearRampToValueAtTime(1000, audioCtx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+                osc.start(); osc.stop(audioCtx.currentTime + 0.5);
+            }
+        }
+
+        // --- AUTH ---
         function auth(t) {
             const u = document.getElementById('u').value;
             const p = document.getElementById('p').value;
             if(u && p) socket.emit('login_action', {pseudo: u, password: p, type: t});
         }
-        socket.on('auth_error', m => document.getElementById('auth-err').innerText = m);
-        socket.on('notif', m => alert(m));
-        
+        socket.on('auth_error', m => showToast(m, 'error'));
         socket.on('login_ok', d => {
-            myPseudo = d.pseudo;
             document.getElementById('auth-overlay').style.display = 'none';
             updateUI(d);
+            showToast(`Bienvenue ${d.pseudo} !`, 'success');
         });
+
+        // --- UI & LOGIC ---
+        let emojis = ["👆", "👊", "🔥", "💎", "👑", "🚀", "🪐", "⚡", "🐲", "🤖"];
 
         function updateUI(d) {
             document.getElementById('score-val').innerText = d.clicks;
             document.getElementById('cost-val').innerText = d.mult * 100;
-            document.getElementById('guild-tag').innerText = d.guild || "Sans Guilde";
+            document.getElementById('guild-tag').innerText = d.guild || "Aucune";
             document.getElementById('rank-badge').innerText = d.rank;
+            myMult = d.mult;
+
+            // Fix Emoji Logic
+            let scoreInt = parseInt(d.clicks);
+            let idx = Math.floor(scoreInt / 500) % emojis.length;
+            document.getElementById('btn-clicker').innerText = emojis[idx];
         }
 
-        // CLICKER
-        function clickAction() {
-            socket.emit('add_click');
-            let s = document.getElementById('score-val');
-            s.innerText = parseInt(s.innerText) + 1; // Simulation visuelle
-        }
+        socket.on('update_full_state', d => updateUI(d));
         socket.on('update_score', d => {
             document.getElementById('score-val').innerText = d.clicks;
             document.getElementById('rank-badge').innerText = d.rank;
-        });
-
-        // CASINO
-        function spinWheel() {
-            document.getElementById('slot-display').innerText = "🎰 🎰 🎰";
-            socket.emit('spin_wheel');
-        }
-        socket.on('spin_result', d => {
-            const disp = document.getElementById('slot-display');
-            const msg = document.getElementById('casino-msg');
             
-            if(d.outcome === 'perdu') { disp.innerText = "❌ ❌ ❌"; msg.innerText = "Perdu... (-500)"; msg.style.color = "var(--red)"; }
-            else if(d.outcome === 'x2') { disp.innerText = "🍒 🍒 🍒"; msg.innerText = "GAGNÉ ! (+1000)"; msg.style.color = "var(--green)"; }
-            else if(d.outcome === 'x5') { disp.innerText = "💎 💎 💎"; msg.innerText = "GROS LOT ! (+2500)"; msg.style.color = "var(--gold)"; }
-            else { disp.innerText = "👑 👑 👑"; msg.innerText = "JACKPOT !!! (+25000)"; msg.style.color = "orange"; }
+            // Emoji update live
+            let idx = Math.floor(d.clicks / 500) % emojis.length;
+            document.getElementById('btn-clicker').innerText = emojis[idx];
         });
 
-        // AMIS
-        function addFriend() { socket.emit('add_friend', {target: document.getElementById('friend-input').value}); }
-        socket.on('update_friends', d => {
-            const reqBox = document.getElementById('requests-box');
-            reqBox.innerHTML = d.requests.map(r => `
-                <div class="friend-item" style="border:1px solid var(--accent)">
-                    <span>Demande de: <b>${r}</b></span>
-                    <button class="btn" style="width:auto; margin:0; padding:5px 10px;" onclick="socket.emit('accept_friend', {target:'${r}'})">Accepter</button>
-                </div>
-            `).join('');
+        // --- CLICKER ---
+        function clickAction() {
+            playSound('click');
+            // Animation locale immédiate
+            let s = document.getElementById('score-val');
+            s.innerText = parseInt(s.innerText) + myMult;
+            
+            // Effet visuel bouton
+            let btn = document.getElementById('btn-clicker');
+            btn.classList.remove('pulse-anim');
+            void btn.offsetWidth; // trigger reflow
+            btn.classList.add('pulse-anim');
 
-            const listBox = document.getElementById('friends-list');
-            listBox.innerHTML = d.friends.map(f => `
-                <div class="friend-item">
-                    <div>
-                        <span class="status-dot ${f.online ? 'online':'offline'}"></span>
-                        ${f.name}
-                    </div>
-                    <small style="color:#666">${f.online ? 'En ligne' : 'Absent'}</small>
-                </div>
-            `).join('');
-        });
-
-        // CHAT & NAVIGATION
-        function sendMsg() { 
-            let i = document.getElementById('mi');
-            if(i.value) socket.emit('msg', {m: i.value}); 
-            i.value = "";
+            socket.emit('add_click');
         }
-        socket.on('new_msg', d => {
-            let b = document.getElementById('chat-msgs');
-            b.innerHTML += `<div style="margin-bottom:5px"><span style="font-size:0.7rem; background:#333; padding:2px; border-radius:3px;">${d.r}</span> <b>${d.p}:</b> ${d.m}</div>`;
-            b.scrollTop = b.scrollHeight;
-        });
 
-        function showView(id, el) {
+        function buyUpgrade() {
+            socket.emit('buy_upgrade');
+            // Le son 'coin' sera joué si succès via le notif
+        }
+
+        // --- CASINO ANIMATION ---
+        let spinning = false;
+        function spinCasino() {
+            if(spinning) return;
+            let currentScore = parseInt(document.getElementById('score-val').innerText);
+            if(currentScore < 500) return showToast("Pas assez d'argent !", "error");
+
+            spinning = true;
+            document.getElementById('btn-spin').disabled = true;
+            document.getElementById('casino-result').innerText = "";
+            socket.emit('spin_wheel');
+            
+            // Animation Loop
+            let slots = [document.getElementById('s1'), document.getElementById('s2'), document.getElementById('s3')];
+            let symbols = ["🍒", "🍋", "🍇", "💎", "7️⃣"];
+            
+            let interval = setInterval(() => {
+                slots.forEach(s => s.innerText = symbols[Math.floor(Math.random() * symbols.length)]);
+                playSound('spin');
+            }, 100);
+
+            // Attente du résultat
+            socket.once('spin_result', d => {
+                setTimeout(() => { // On laisse tourner un peu pour le suspense (1.5s)
+                    clearInterval(interval);
+                    spinning = false;
+                    document.getElementById('btn-spin').disabled = false;
+
+                    // Affichage résultat
+                    let resSym = d.outcome === 'perdu' ? ["❌","❌","❌"] : 
+                                 d.outcome === 'x2' ? ["🍒","🍒","🍒"] : 
+                                 d.outcome === 'x5' ? ["💎","💎","💎"] : ["👑","👑","👑"];
+                    
+                    if(d.outcome === 'perdu') { // Perdu : on mélange
+                         slots[0].innerText = "❌"; slots[1].innerText = "🍋"; slots[2].innerText = "🍇";
+                         showToast("Perdu...", "error");
+                    } else {
+                        slots.forEach((s, i) => s.innerText = resSym[i]);
+                        playSound('win');
+                        showToast(`GAGNÉ ! +${d.gain}`, "success");
+                    }
+                }, 1500);
+            });
+        }
+
+        // --- TOAST SYSTEM (Popups) ---
+        function showToast(msg, type) {
+            const box = document.createElement('div');
+            box.className = `toast ${type}`;
+            box.innerText = msg;
+            document.getElementById('toast-container').appendChild(box);
+            
+            // Trigger animation
+            setTimeout(() => box.classList.add('show'), 10);
+            
+            // Auto remove
+            setTimeout(() => {
+                box.classList.remove('show');
+                setTimeout(() => box.remove(), 300);
+            }, 3000);
+
+            if(type === 'success') playSound('coin');
+        }
+
+        socket.on('notif_success', m => showToast(m, 'success'));
+        socket.on('notif_error', m => showToast(m, 'error'));
+
+        // --- NAV ---
+        function switchView(id, el) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('view-'+id).classList.add('active');
@@ -214,9 +311,11 @@
         }
 
         socket.on('relative_lb', d => {
-            document.getElementById('rel-rows').innerHTML = d.lb.map(u => `
-                <div style="display:flex; justify-content:space-between; padding:5px; ${u.pseudo === myPseudo ? 'color:var(--accent)':''}">
-                    <span>${u.pseudo}</span><span>${u.clicks}</span>
+            const box = document.getElementById('relative-lb-box');
+            box.innerHTML = d.lb.map(u => `
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #222; padding:4px;">
+                    <span style="${u.pseudo === document.getElementById('u').value ? 'color:var(--accent)':''}">${u.pseudo}</span>
+                    <span>${u.clicks}</span>
                 </div>
             `).join('');
         });
