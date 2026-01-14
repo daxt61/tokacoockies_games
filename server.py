@@ -1,5 +1,5 @@
 import os
-from flask import Flask, send_file
+from flask import Flask, render_template, request  # <-- J'ai ajouté render_template et request
 from flask_socketio import SocketIO, emit
 from flask_bcrypt import Bcrypt
 from supabase import create_client, Client
@@ -9,7 +9,7 @@ app.config['SECRET_KEY'] = 'sorek_v9_ultra_secure'
 bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# CONFIG SUPABASE - Remplace par tes vraies clés
+# --- CONFIG SUPABASE CORRIGÉE ---
 SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
 SUPABASE_KEY = "sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -516,6 +516,7 @@ def on_disconnect():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
 
 
 
