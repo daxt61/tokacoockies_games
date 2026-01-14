@@ -441,30 +441,19 @@ def get_friends():
     from flask import request
     try:
         user_data = connected_users.get(request.sid)
-        if not user_data:
-            return
+        if not user_data: return
         
-        pseudo = user_data['pseudo']
+        p = user_data['pseudo']
+        # Correction ici : ajout des " autour du pseudo
+        res = supabase.table("friendships").select("*").or_(f'user1.eq."{p}",user2.eq."{p}"').execute()
         
-        # Récupère les amitiés
-        friendships = supabase.table("friendships").select("*").or_(f"user1.eq.{pseudo},user2.eq.{pseudo}").execute()
+        friends = []
+        for f in res.data:
+            friends.append(f['user2'] if f['user1'] == p else f['user1'])
         
-        friends_list = []
-        for f in friendships.data:
-            friend_pseudo = f['user2'] if f['user1'] == pseudo else f['user1']
-            friend_data = get_user_data(friend_pseudo)
-            if friend_data:
-                friends_list.append({
-                    'pseudo': friend_pseudo,
-                    'clicks': friend_data['clicks'],
-                    'online': any(u['pseudo'] == friend_pseudo for u in connected_users.values())
-                })
-        
-        emit('friends_list', {'friends': friends_list})
-        
+        emit('friends_list', {'friends': friends})
     except Exception as e:
         print(f"Erreur get_friends: {e}")
-
 @socketio.on('remove_friend')
 def remove_friend(data):
     from flask import request
@@ -516,6 +505,7 @@ def on_disconnect():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
 
 
 
