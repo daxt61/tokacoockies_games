@@ -95,7 +95,37 @@ def spin():
     supabase.table("users").update({"clicks": new_total}).eq("pseudo", p).execute()
     emit('spin_result', {'outcome': 'gagné' if win else 'perdu', 'clicks': new_total})
 
+@socketio.on('buy_upgrade')
+def buy_up():
+    sid = request.sid
+    if sid in connected_users:
+        p = connected_users[sid]['pseudo']
+        # On récupère les vraies valeurs en base de données pour éviter la triche
+        res = supabase.table("users").select("clicks", "multiplier").eq("pseudo", p).execute()
+        if res.data:
+            clicks = res.data[0]['clicks']
+            mult = res.data[0]['multiplier']
+            cost = mult * 100
+            
+            if clicks >= cost:
+                new_clicks = clicks - cost
+                new_mult = mult + 1
+                # Mise à jour Supabase
+                supabase.table("users").update({"clicks": new_clicks, "multiplier": new_mult}).eq("pseudo", p).execute()
+                # Mise à jour mémoire locale du serveur
+                connected_users[sid]['mult'] = new_mult
+                # Envoi au joueur
+                emit('update_full_state', {
+                    'clicks': new_clicks, 
+                    'mult': new_mult, 
+                    'rank': get_rank(new_clicks)
+                })
+                emit('notif', "Amélioration achetée ! 🚀")
+            else:
+                emit('notif', "Pas assez de clics ! ❌")
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
+
 
 
