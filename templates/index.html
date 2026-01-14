@@ -3,31 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Sorek Empire V8</title>
+    <title>Sorek Empire V8.1</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         :root { --accent: #00d2ff; --gold: #ffca28; --bg: #0d1117; }
-        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; height: 100dvh; display: flex; flex-direction: column; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* SYSTÈME DE NOTIFICATION (TOAST) */
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; width: 80%; max-width: 300px; pointer-events: none; }
+        .toast { background: rgba(0, 0, 0, 0.85); border: 1px solid var(--accent); color: white; padding: 12px; border-radius: 8px; margin-bottom: 8px; text-align: center; font-size: 0.9rem; animation: slideIn 0.3s ease-out, fadeOut 0.5s ease-in 2s forwards; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        @keyframes slideIn { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }
+
         header { padding: 15px; background: #161b22; display: flex; justify-content: space-between; border-bottom: 1px solid #30363d; }
         .view { display: none; padding: 20px; height: 100%; overflow-y: auto; text-align: center; }
         .view.active { display: block; }
         #score-big { font-size: 3.5rem; font-weight: 800; color: var(--accent); display: block; margin-top: 20px; }
-        #btn-clicker { width: 180px; height: 180px; border-radius: 50%; border: 6px solid var(--accent); background: #161b22; font-size: 5rem; margin: 20px auto; cursor: pointer; transition: 0.05s; }
+        #btn-clicker { width: 180px; height: 180px; border-radius: 50%; border: 6px solid var(--accent); background: #161b22; font-size: 5rem; margin: 20px auto; cursor: pointer; transition: 0.05s; display: flex; align-items: center; justify-content: center; }
         #btn-clicker:active { transform: scale(0.9); }
-        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); margin-top: 10px; }
+        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); margin-top: 10px; color: black; }
         input { width: 100%; padding: 12px; background: #010409; border: 1px solid #30363d; color: white; border-radius: 8px; margin-bottom: 10px; }
-        #chat-box { height: 150px; background: #010409; border-radius: 8px; overflow-y: auto; padding: 10px; text-align: left; margin-bottom: 10px; font-size: 0.9rem; }
-        #lb-list { background: #161b22; padding: 10px; border-radius: 10px; text-align: left; margin-top: 20px; }
+        #chat-box { height: 150px; background: #010409; border-radius: 8px; overflow-y: auto; padding: 10px; text-align: left; margin-bottom: 10px; font-size: 0.85rem; border: 1px solid #333; }
+        #lb-list { background: #161b22; padding: 12px; border-radius: 10px; text-align: left; margin-top: 20px; border: 1px solid #333; }
         nav { height: 70px; background: #161b22; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #30363d; }
         .nav-item { color: #8b949e; font-size: 0.8rem; cursor: pointer; }
-        .nav-item.active { color: var(--accent); }
+        .nav-item.active { color: var(--accent); font-weight: bold; }
         #auth-overlay { position: fixed; inset: 0; background: #0d1117; z-index: 1000; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
+    <div id="toast-container"></div>
+
     <div id="auth-overlay">
         <div style="width: 80%; max-width: 300px; text-align: center;">
-            <h1 style="color:var(--accent)">SOREK EMPIRE</h1>
+            <h1 style="color:var(--accent); letter-spacing: 2px;">SOREK EMPIRE</h1>
             <input id="u" placeholder="Pseudo">
             <input id="p" type="password" placeholder="Mot de passe">
             <button class="btn" onclick="auth('login')">JOUER</button>
@@ -36,7 +45,7 @@
     </div>
 
     <header>
-        <span id="rank-badge" style="background:var(--accent); color:black; padding:2px 8px; border-radius:4px; font-weight:bold;">Vagabond</span>
+        <span id="rank-badge" style="background:var(--accent); color:black; padding:2px 8px; border-radius:4px; font-weight:bold; font-size: 0.8rem;">Vagabond</span>
         <span id="guild-display" style="color:var(--gold); font-weight:bold;">[SOLO]</span>
     </header>
 
@@ -44,28 +53,28 @@
         <div id="view-clicker" class="view active">
             <span id="score-big">0</span>
             <button id="btn-clicker" onclick="clickAction()">👆</button>
-            <p>Puissance : x<b id="mult-val">1</b></p>
+            <p style="margin-top: 5px; opacity: 0.8;">Puissance : x<b id="mult-val">1</b></p>
             <button class="btn" onclick="socket.emit('buy_upgrade')">BOOSTER (💰 <span id="cost-val">100</span>)</button>
             
             <div id="lb-list">
-                <h4 style="margin:0 0 10px 0; color:var(--gold)">🏆 TOP 5 MONDIAL</h4>
+                <h4 style="margin:0 0 10px 0; color:var(--gold); font-size: 0.85rem; border-bottom: 1px solid #333; padding-bottom: 5px;">🏆 TOP 5 MONDIAL</h4>
                 <div id="lb-content"></div>
             </div>
         </div>
 
         <div id="view-casino" class="view">
             <h2 style="color:var(--gold)">🎰 CASINO</h2>
-            <div id="slot-machine" style="font-size:3rem; margin:30px 0;">❓ ❓ ❓</div>
-            <button class="btn" style="background:var(--gold)" onclick="spinCasino()">MISER 500</button>
+            <div id="slot-machine" style="font-size:3.5rem; margin:30px 0; background: #000; padding: 20px; border-radius: 15px; border: 2px dashed var(--gold);">❓ ❓ ❓</div>
+            <button class="btn" style="background:var(--gold)" onclick="spinCasino()" id="btn-spin">MISER 500 CLICS</button>
         </div>
 
         <div id="view-social" class="view">
-            <h3>🛡️ GUILDE</h3>
-            <input id="g-name" placeholder="Nom de la guilde">
-            <button class="btn" onclick="createGuild()">FONDER</button>
-            <h3 style="margin-top:30px;">💬 TCHAT</h3>
+            <h3 style="text-align: left; font-size: 1rem;">🛡️ MA GUILDE</h3>
+            <div style="display:flex; gap:5px;"><input id="g-name" placeholder="Nom..." style="margin:0;"><button class="btn" style="width:100px; margin:0; font-size:0.7rem;" onclick="createGuild()">FONDER</button></div>
+            
+            <h3 style="margin-top:30px; text-align: left; font-size: 1rem;">💬 TCHAT MONDIAL</h3>
             <div id="chat-box"></div>
-            <div style="display:flex; gap:5px;"><input id="mi" style="margin:0;"><button class="btn" style="width:60px; margin:0" onclick="sendMsg()">➤</button></div>
+            <div style="display:flex; gap:5px;"><input id="mi" placeholder="Ton message..." style="margin:0;"><button class="btn" style="width:60px; margin:0" onclick="sendMsg()">➤</button></div>
         </div>
     </main>
 
@@ -79,6 +88,16 @@
         const socket = io();
         let myMult = 1;
         let audioCtx = null;
+
+        // Fonction de Notification non-bloquante
+        function toast(message) {
+            const container = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.innerText = message;
+            container.appendChild(t);
+            setTimeout(() => { t.remove(); }, 2500);
+        }
 
         function playSfx(f) {
             if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -95,7 +114,8 @@
             if(u && p) socket.emit('login_action', {pseudo: u, password: p, type: t});
         }
 
-        socket.on('login_ok', d => { document.getElementById('auth-overlay').style.display = 'none'; updateUI(d); });
+        socket.on('login_ok', d => { document.getElementById('auth-overlay').style.display = 'none'; updateUI(d); toast("Bienvenue, " + d.pseudo + " !"); });
+        socket.on('auth_error', m => toast("Erreur: " + m));
 
         function updateUI(d) {
             if(d.clicks !== undefined) document.getElementById('score-big').innerText = d.clicks.toLocaleString();
@@ -117,32 +137,44 @@
 
         socket.on('lb_update', d => {
             document.getElementById('lb-content').innerHTML = d.players.map((p,i) => `
-                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
-                    <span>${i+1}. ${p.pseudo}</span><b>${p.clicks.toLocaleString()}</b>
+                <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px; border-bottom: 1px solid #222; padding-bottom: 2px;">
+                    <span>${i+1}. ${p.pseudo}</span><b style="color:var(--accent)">${p.clicks.toLocaleString()}</b>
                 </div>`).join('');
         });
+
+        function spinCasino() {
+            document.getElementById('btn-spin').disabled = true;
+            socket.emit('spin_wheel');
+        }
 
         socket.on('spin_result', d => {
             document.getElementById('slot-machine').innerText = d.outcome === 'gagné' ? "💎 💎 💎" : "❌ 🍋 🍒";
             playSfx(d.outcome === 'gagné' ? 880 : 150);
+            toast(d.outcome === 'gagné' ? "JACKPOT ! +2500" : "Perdu... -500");
             document.getElementById('score-big').innerText = d.clicks.toLocaleString();
+            document.getElementById('btn-spin').disabled = false;
         });
 
-        function sendMsg() { const i = document.getElementById('mi'); socket.emit('msg', {m: i.value}); i.value = ""; }
+        function sendMsg() { const i = document.getElementById('mi'); if(i.value) socket.emit('msg', {m: i.value}); i.value = ""; }
         socket.on('new_msg', d => {
             const b = document.getElementById('chat-box');
-            b.innerHTML += `<div><b>${d.p}:</b> ${d.m}</div>`;
+            b.innerHTML += `<div><span style="color:var(--accent); font-weight:bold;">${d.p}:</span> ${d.m}</div>`;
             b.scrollTop = b.scrollHeight;
         });
 
-        function createGuild() { socket.emit('create_guild', {name: document.getElementById('g-name').value}); }
+        function createGuild() { 
+            const n = document.getElementById('g-name').value;
+            if(n) socket.emit('create_guild', {name: n}); 
+        }
+
         function showV(id, el) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('view-'+id).classList.add('active'); el.classList.add('active');
         }
+        
         socket.on('update_full_state', d => updateUI(d));
-        socket.on('notif', m => alert(m));
+        socket.on('notif', m => toast(m)); // On utilise toast à la place d'alert
     </script>
 </body>
 </html>
