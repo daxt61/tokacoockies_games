@@ -10,8 +10,8 @@ bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # CONFIG SUPABASE - Remplace par tes vraies clés
-SUPABASE_URL = os.environ.get("https://rzzhkdzjnjeeoqbtlles.supabase.co")
-SUPABASE_KEY = os.environ.get("sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao")
+SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
+SUPABASE_KEY = "sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 connected_users = {}  # {sid: {pseudo, mult, guild, ...}}
@@ -514,6 +514,7 @@ def on_disconnect():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
 
 
 
