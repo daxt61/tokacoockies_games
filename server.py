@@ -130,7 +130,37 @@ def disc():
         del connected_users[request.sid]
         broadcast_global()
 
+@socketio.on('add_click')
+def add_click():
+    sid = request.sid
+    if sid in connected_users:
+        u = connected_users[sid]
+        # Update User
+        res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
+        new_val = res.data[0]['clicks'] + u['mult']
+        supabase.table("users").update({"clicks": new_val}).eq("pseudo", u['pseudo']).execute()
+        
+        # Update Guild
+        if u['guild']:
+            g_res = supabase.table("guilds").select("total_clicks").eq("name", u['guild']).execute()
+            if g_res.data:
+                g_val = g_res.data[0]['total_clicks'] + u['mult']
+                supabase.table("guilds").update({"total_clicks": g_val}).eq("name", u['guild']).execute()
+        
+        emit('update_score', {'clicks': new_val})
+        
+        # --- MISE À JOUR LIVE POUR TOUT LE MONDE ---
+        send_relative_lb(u['pseudo'], sid)
+        broadcast_leaderboards() # Nouvelle fonction à appeler
+
+def broadcast_leaderboards():
+    # Envoie le top 20 à tout le monde automatiquement
+    u_res = supabase.table("users").select("pseudo", "clicks").order("clicks", desc=True).limit(20).execute()
+    g_res = supabase.table("guilds").select("name", "total_clicks").order("total_clicks", desc=True).limit(20).execute()
+    socketio.emit('full_lb_data', {'users': u_res.data, 'guilds': g_res.data})
+
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+
 
 
