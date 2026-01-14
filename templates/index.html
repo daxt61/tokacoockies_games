@@ -2,100 +2,216 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Sorek Clicker - HUD Classique</title>
+    <title>Sorek Clicker V9 - HUD Original</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { margin: 0; background: #0f0c29; color: white; font-family: sans-serif; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* SIDEBAR (TON HUD D'AVANT) */
-        .sidebar { width: 260px; background: #1a1a2e; border-right: 3px solid #e94560; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        .stat-card { background: #16213e; padding: 15px; border-radius: 8px; border: 1px solid #444; }
-        
-        /* CLICKER CENTRAL */
-        .main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: radial-gradient(circle, #1a1a2e 0%, #0f0c29 100%); }
-        #click-btn { width: 220px; height: 220px; border-radius: 50%; border: 8px solid white; background: #e94560; font-size: 2em; font-weight: bold; cursor: pointer; box-shadow: 0 0 40px #e94560; transition: 0.1s; display: flex; align-items: center; justify-content: center; }
-        #click-btn:active { transform: scale(0.9); }
+        :root {
+            --primary: #e94560;
+            --secondary: #16213e;
+            --bg: #0f0c29;
+            --accent: #00fff2;
+        }
 
-        /* BOUTON SOCIAL AVEC BADGE */
+        body { 
+            margin: 0; 
+            background: var(--bg); 
+            color: white; 
+            font-family: 'Segoe UI', sans-serif; 
+            display: flex; 
+            height: 100vh; 
+            overflow: hidden; 
+        }
+        
+        /* SIDEBAR STYLE */
+        .sidebar { 
+            width: 280px; 
+            background: rgba(26, 26, 46, 0.95); 
+            border-right: 2px solid var(--primary); 
+            padding: 25px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 20px;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+        }
+
+        .stat-card { 
+            background: var(--secondary); 
+            padding: 15px; 
+            border-radius: 12px; 
+            border: 1px solid rgba(233, 69, 96, 0.3);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        .stat-card h3 { margin: 0 0 10px 0; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card p { margin: 5px 0; font-size: 0.9em; opacity: 0.9; }
+
+        /* MAIN CLICKER AREA */
+        .main { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            background: radial-gradient(circle at center, #1a1a2e 0%, #0f0c29 100%); 
+        }
+
+        #score-display {
+            font-size: 4em;
+            font-weight: bold;
+            text-shadow: 0 0 20px var(--primary);
+            margin-bottom: 20px;
+        }
+
+        #click-btn { 
+            width: 240px; 
+            height: 240px; 
+            border-radius: 50%; 
+            border: 6px solid #fff; 
+            background: linear-gradient(145deg, var(--primary), #a31d35); 
+            font-size: 1.8em; 
+            font-weight: bold; 
+            color: white;
+            cursor: pointer; 
+            box-shadow: 0 0 50px rgba(233, 69, 96, 0.6); 
+            transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            user-select: none;
+            text-transform: uppercase;
+        }
+
+        #click-btn:active { transform: scale(0.92); box-shadow: 0 0 20px var(--primary); }
+
+        /* BOUTONS & UI */
+        button { 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            padding: 12px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: bold;
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+
+        button:hover { filter: brightness(1.2); transform: translateY(-2px); }
+
         .social-container { position: relative; width: 100%; }
-        .badge { position: absolute; top: -8px; right: -8px; background: red; border-radius: 50%; padding: 3px 8px; font-size: 12px; display: none; }
+        .badge { 
+            position: absolute; top: -10px; right: -10px; 
+            background: #ff0000; color: white; border-radius: 50%; 
+            padding: 4px 10px; font-size: 12px; font-weight: bold;
+            box-shadow: 0 0 10px red;
+            display: none; 
+        }
 
-        /* MODAL ET ONGLETS */
-        .modal { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #16213e; border: 2px solid #e94560; padding: 20px; border-radius: 12px; z-index: 100; width: 400px; }
-        .tab-btn { background: #1a1a2e; color: white; border: 1px solid #e94560; padding: 8px; cursor: pointer; }
-        .tab-btn.active { background: #e94560; }
-        .tab-content { display: none; margin-top: 15px; max-height: 300px; overflow-y: auto; }
+        /* MODAL */
+        .modal { 
+            display: none; position: fixed; top: 50%; left: 50%; 
+            transform: translate(-50%, -50%); 
+            background: #16213e; border: 2px solid var(--primary); 
+            padding: 25px; border-radius: 15px; z-index: 100; 
+            width: 450px; box-shadow: 0 0 100px rgba(0,0,0,0.8);
+        }
+
+        .tab-btn { background: #1a1a2e; border: 1px solid var(--primary); flex: 1; }
+        .tab-btn.active { background: var(--primary); }
+        .tab-content { display: none; margin-top: 20px; max-height: 350px; overflow-y: auto; }
+
+        input { background: #0f0c29; border: 1px solid var(--primary); color: white; padding: 10px; border-radius: 5px; width: calc(100% - 22px); margin-bottom: 10px; }
         
-        button { background: #e94560; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
-        input { background: #0f0c29; border: 1px solid #e94560; color: white; padding: 8px; border-radius: 5px; }
-        .item { display: flex; justify-content: space-between; background: rgba(255,255,255,0.05); padding: 8px; margin: 5px 0; border-radius: 4px; align-items: center; }
+        .item { 
+            display: flex; justify-content: space-between; 
+            background: rgba(255,255,255,0.05); padding: 12px; 
+            margin: 8px 0; border-radius: 8px; align-items: center; 
+            border-left: 3px solid var(--primary);
+        }
         
-        #login-screen { position: fixed; width: 100%; height: 100%; background: #0f0c29; z-index: 999; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+        #login-screen { 
+            position: fixed; width: 100%; height: 100%; 
+            background: var(--bg); z-index: 1000; 
+            display: flex; flex-direction: column; align-items: center; 
+            justify-content: center; gap: 15px; 
+        }
+
+        #login-screen h1 { font-size: 3em; color: var(--primary); text-shadow: 0 0 20px var(--primary); }
     </style>
 </head>
 <body>
 
     <div id="login-screen">
-        <h2>SOREK CLICKER</h2>
-        <input type="text" id="pseudo" placeholder="Pseudo">
-        <input type="password" id="password" placeholder="Mot de passe">
-        <button onclick="auth('login')">Se connecter</button>
-        <button onclick="auth('register')">S'inscrire</button>
+        <h1>SOREK V9</h1>
+        <div style="width: 300px; display: flex; flex-direction: column; gap: 10px;">
+            <input type="text" id="pseudo" placeholder="NOM D'UTILISATEUR">
+            <input type="password" id="password" placeholder="MOT DE PASSE">
+            <button onclick="auth('login')">CONNEXION</button>
+            <button onclick="auth('register')" style="background: transparent; border: 1px solid var(--primary);">INSCRIPTION</button>
+        </div>
     </div>
 
     <div class="sidebar">
         <div class="stat-card">
-            <h3 id="u-pseudo">...</h3>
-            <p>🏅 Rang: <span id="u-rank">Vagabond</span></p>
-            <p>🏰 Guilde: <span id="u-guild">Aucune</span></p>
+            <h3 id="u-pseudo">JOUEUR</h3>
+            <p>🏆 RANG: <span id="u-rank" style="color:var(--accent)">Vagabond</span></p>
+            <p>🛡️ GUILDE: <span id="u-guild">Aucune</span></p>
         </div>
         
-        <div class="social-container">
-            <button onclick="openSocial()" style="width:100%">💬 SOCIAL</button>
-            <span id="global-badge" class="badge">0</span>
+        <div class="stat-card">
+            <p>MULTIPLIER: <span id="u-mult" style="color:var(--accent)">1</span></p>
+            <p>COÛT UP: <span id="u-cost" style="color:var(--primary)">100</span></p>
         </div>
 
-        <button onclick="socket.emit('buy_upgrade')" style="background:#27ae60">🚀 BOOSTER (x<span id="u-mult">1</span>)</button>
+        <button onclick="socket.emit('buy_upgrade')" style="background:#27ae60">🚀 ACHETER BOOSTER</button>
         
-        <div style="margin-top:auto; font-size: 0.8em; color: #888;">
-            <b>Amis :</b>
-            <div id="mini-friends"></div>
+        <div class="social-container">
+            <button onclick="openSocial()" style="width:100%">💬 MENU SOCIAL</button>
+            <span id="global-badge" class="badge">0</span>
+        </div>
+        
+        <div style="margin-top:auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
+            <b style="color:var(--accent); font-size: 0.8em;">AMIS EN LIGNE</b>
+            <div id="mini-friends" style="font-size: 0.85em; margin-top: 5px;"></div>
         </div>
     </div>
 
     <div class="main">
-        <h1 style="font-size: 3em;"><span id="u-score">0</span> Clics</h1>
-        <div id="click-btn">CLIC !</div>
+        <div id="score-display"><span id="u-score">0</span></div>
+        <div id="click-btn">CLICK !</div>
     </div>
 
     <div id="social-modal" class="modal">
-        <div style="display:flex; justify-content:space-between;">
-            <h3>Menu Social</h3>
-            <button onclick="toggleSocial()" style="background:red">X</button>
+        <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 15px;">
+            <h2 style="margin:0; color: var(--primary);">SOCIAL</h2>
+            <button onclick="toggleSocial()" style="background:transparent; font-size: 1.5em; padding: 0;">&times;</button>
         </div>
-        <div style="display:flex; gap:2px;">
-            <button class="tab-btn active" onclick="showTab('t-chat')">Tchat</button>
-            <button class="tab-btn" onclick="showTab('t-friends')">Amis</button>
-            <button class="tab-btn" onclick="showTab('t-req')">Demandes <span id="dot" style="color:red;display:none;">●</span></button>
+        <div style="display:flex; gap:5px;">
+            <button class="tab-btn active" onclick="showTab('t-chat')">CHAT</button>
+            <button class="tab-btn" onclick="showTab('t-friends')">AMIS</button>
+            <button class="tab-btn" onclick="showTab('t-req')">REQUIS <span id="dot" style="color:var(--primary);display:none;">●</span></button>
         </div>
 
         <div id="t-chat" class="tab-content" style="display:block;">
-            <div id="chat-box" style="height:200px; border:1px solid #444; overflow-y:auto; margin-bottom:10px; padding:5px;"></div>
-            <input type="text" id="m-in" placeholder="Message..." style="width:70%">
-            <button onclick="sendMsg()">OK</button>
+            <div id="chat-box" style="height:200px; background: rgba(0,0,0,0.3); border-radius: 8px; overflow-y:auto; margin-bottom:10px; padding:10px; font-size: 0.9em; border: 1px solid rgba(255,255,255,0.1);"></div>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="m-in" placeholder="Message..." style="margin:0;">
+                <button onclick="sendMsg()">></button>
+            </div>
         </div>
 
         <div id="t-friends" class="tab-content">
-            <input type="text" id="f-in" placeholder="Pseudo...">
-            <button onclick="socket.emit('send_friend_request', {target: document.getElementById('f-in').value})">Ajouter</button>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="f-in" placeholder="Chercher un pseudo..." style="margin:0;">
+                <button onclick="socket.emit('send_friend_request', {target: document.getElementById('f-in').value})">+</button>
+            </div>
             <div id="f-list"></div>
         </div>
 
         <div id="t-req" class="tab-content">
-            <p><b>🤝 Amis :</b></p>
+            <h4 style="color: var(--primary); margin-top: 0;">DEMANDES D'AMIS</h4>
             <div id="r-list"></div>
-            <hr>
-            <p><b>🛡️ Guildes :</b></p>
+            <h4 style="color: var(--primary); margin-top: 20px;">INVITATIONS GUILDE</h4>
             <div id="g-list"></div>
         </div>
     </div>
@@ -115,74 +231,88 @@
 
         socket.on('update_score', (data) => updateUI(data));
         socket.on('update_full_state', (data) => updateUI(data));
-        socket.on('success', (m) => alert(m));
-        socket.on('error', (m) => alert(m));
+        socket.on('success', (m) => showNotif(m, 'green'));
+        socket.on('error', (m) => showNotif(m, 'red'));
 
         function updateUI(d) {
             if(d.pseudo) document.getElementById('u-pseudo').innerText = d.pseudo;
-            if(d.clicks !== undefined) document.getElementById('u-score').innerText = Math.floor(d.clicks);
-            if(d.mult !== undefined) document.getElementById('u-mult').innerText = d.mult;
+            if(d.clicks !== undefined) document.getElementById('u-score').innerText = Math.floor(d.clicks).toLocaleString();
+            if(d.mult !== undefined) {
+                document.getElementById('u-mult').innerText = d.mult;
+                document.getElementById('u-cost').innerText = (d.mult * 100).toLocaleString();
+            }
             if(d.rank) document.getElementById('u-rank').innerText = d.rank;
             if(d.guild) document.getElementById('u-guild').innerText = d.guild;
         }
 
-        // SOCIAL LOGIC
+        function showNotif(msg, col) {
+            // Optionnel : tu peux utiliser un toast ici, pour l'instant alert
+            alert(msg);
+        }
+
+        // SOCIAL
         socket.on('social_update', (d) => {
-            // Amis
-            document.getElementById('f-list').innerHTML = d.friends.map(f => `<div class="item"><span>${f}</span></div>`).join('');
-            document.getElementById('mini-friends').innerHTML = d.friends.map(f => `<div>🟢 ${f}</div>`).join('');
+            document.getElementById('f-list').innerHTML = d.friends.map(f => `<div class="item"><span>🟢 ${f}</span></div>`).join('');
+            document.getElementById('mini-friends').innerHTML = d.friends.map(f => `<div>• ${f}</div>`).join('');
             
-            // Demandes Amis
             document.getElementById('r-list').innerHTML = d.friend_requests.map(r => `
                 <div class="item"><span>${r}</span>
                     <div>
-                        <button onclick="socket.emit('respond_friend_request',{target:'${r}',action:'accept'})" style="background:green">✔</button>
-                        <button onclick="socket.emit('respond_friend_request',{target:'${r}',action:'decline'})" style="background:red">✖</button>
+                        <button onclick="socket.emit('respond_friend_request',{target:'${r}',action:'accept'})" style="background:green; padding:5px 10px;">✔</button>
+                        <button onclick="socket.emit('respond_friend_request',{target:'${r}',action:'decline'})" style="background:red; padding:5px 10px;">✖</button>
                     </div>
                 </div>`).join('') || "Aucune demande";
 
-            // Invitations Guilde
             document.getElementById('g-list').innerHTML = d.guild_invites.map(g => `
                 <div class="item"><span>${g}</span>
-                    <button onclick="socket.emit('respond_guild_invite',{guild_name:'${g}',action:'accept'})" style="background:green">Rejoindre</button>
+                    <button onclick="socket.emit('respond_guild_invite',{guild_name:'${g}',action:'accept'})" style="background:green">REJOINDRE</button>
                 </div>`).join('') || "Aucune invitation";
 
-            const total = d.friend_requests.length + d.guild_invites.length;
-            document.getElementById('dot').style.display = total > 0 ? 'inline' : 'none';
-            checkGlobalBadge(total);
+            const totalReq = d.friend_requests.length + d.guild_invites.length;
+            document.getElementById('dot').style.display = totalReq > 0 ? 'inline' : 'none';
+            updateBadge(totalReq);
         });
 
         socket.on('new_msg', (d) => {
             const b = document.getElementById('chat-box');
-            b.innerHTML += `<div><b>${d.p}:</b> ${d.m}</div>`;
+            b.innerHTML += `<div><b style="color:var(--primary)">${d.p}:</b> ${d.m}</div>`;
             b.scrollTop = b.scrollHeight;
             if(document.getElementById('social-modal').style.display !== 'block') {
                 unread++;
-                checkGlobalBadge();
+                updateBadge();
             }
         });
 
-        function checkGlobalBadge(reqCount = 0) {
+        function updateBadge(reqCount = 0) {
             const badge = document.getElementById('global-badge');
             const total = unread + reqCount;
             badge.innerText = total;
             badge.style.display = total > 0 ? 'block' : 'none';
         }
 
-        function openSocial() { toggleSocial(); unread = 0; checkGlobalBadge(); }
+        function openSocial() { toggleSocial(); unread = 0; updateBadge(); }
+        
         function toggleSocial() { 
             const m = document.getElementById('social-modal');
             m.style.display = m.style.display === 'block' ? 'none' : 'block';
         }
+
         function showTab(id) {
             document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.getElementById(id).style.display = 'block';
             event.target.classList.add('active');
         }
-        function sendMsg() { socket.emit('msg', {m: document.getElementById('m-in').value}); document.getElementById('m-in').value=''; }
+
+        function sendMsg() { 
+            const inp = document.getElementById('m-in');
+            if(inp.value.trim()) {
+                socket.emit('msg', {m: inp.value}); 
+                inp.value=''; 
+            }
+        }
+
         document.getElementById('click-btn').onclick = () => socket.emit('add_click');
     </script>
 </body>
 </html>
-
