@@ -3,322 +3,243 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>tokacookies games</title>
+    <title>Sorek Hub V7 - Ultimate</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        :root { --bg: #101010; --panel: #1a1a1a; --accent: #ffd700; --text: #fff; --green: #4caf50; --red: #f44336; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-        
-        body { background: var(--bg); color: var(--text); margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; user-select: none; }
-
-        /* TOAST NOTIFICATIONS (Meilleures popups) */
-        #toast-container { position: fixed; top: 50px; left: 50%; transform: translateX(-50%); z-index: 5000; width: 90%; max-width: 350px; pointer-events: none; }
-        .toast { background: rgba(30,30,30,0.95); color: #fff; padding: 12px 20px; border-radius: 25px; margin-bottom: 10px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.5); opacity: 0; transform: translateY(-20px); transition: 0.3s; border: 1px solid #333; font-weight: bold; }
-        .toast.show { opacity: 1; transform: translateY(0); }
-        .toast.success { border-color: var(--green); color: var(--green); }
-        .toast.error { border-color: var(--red); color: var(--red); }
+        :root { --bg: #0d1117; --panel: #161b22; --accent: #58a6ff; --gold: #f1c40f; --red: #f85149; --green: #238636; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, system-ui, sans-serif; }
+        body { background: var(--bg); color: #c9d1d9; margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
         /* HEADER */
-        header { padding: 15px; background: var(--panel); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #333; padding-top: env(safe-area-inset-top, 20px); }
-        .badge { background: #333; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight: bold; color: var(--accent); }
+        header { padding: 15px; background: var(--panel); border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; padding-top: env(safe-area-inset-top, 15px); }
+        .stat-box { display: flex; flex-direction: column; }
+        .badge { background: #30363d; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; color: var(--accent); font-weight: bold; width: fit-content; }
 
-        /* MAIN */
+        /* NAVIGATION BASSE */
+        nav { height: 70px; background: var(--panel); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid #30363d; padding-bottom: env(safe-area-inset-bottom); }
+        .nav-item { flex: 1; text-align: center; color: #8b949e; font-size: 0.75rem; cursor: pointer; }
+        .nav-item.active { color: var(--accent); }
+        .nav-item i { display: block; font-size: 1.4rem; margin-bottom: 2px; }
+
+        /* VUES */
         main { flex: 1; overflow-y: auto; position: relative; }
-        .view { display: none; padding: 20px; animation: fadeUp 0.3s ease-out; height: 100%; }
-        .view.active { display: block; }
-        @keyframes fadeUp { from { opacity:0; transform:translateY(15px); } to { opacity:1; transform:translateY(0); } }
+        .view { display: none; padding: 20px; height: 100%; }
+        .view.active { display: block; animation: fadeIn 0.2s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-        /* BUTTON CLICKER */
-        #clicker-container { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 80%; }
-        #btn-clicker { 
-            width: 180px; height: 180px; border-radius: 50%; 
-            background: radial-gradient(circle, #2a2a2a, #000); 
-            border: 6px solid var(--accent); font-size: 5rem; 
-            cursor: pointer; box-shadow: 0 0 30px rgba(255, 215, 0, 0.2);
-            transition: transform 0.05s; display: flex; align-items: center; justify-content: center;
-        }
-        #btn-clicker:active { transform: scale(0.92); border-color: #fff; }
-        .pulse-anim { animation: pulse 0.5s; }
-        @keyframes pulse { 0% {box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);} 70% {box-shadow: 0 0 0 20px rgba(0, 0, 0, 0);} 100% {box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);} }
+        /* BOUTONS & INPUTS */
+        .btn { width: 100%; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; background: var(--accent); color: white; }
+        input { width: 100%; padding: 12px; background: #010409; border: 1px solid #30363d; color: white; border-radius: 8px; margin-bottom: 10px; }
+        
+        /* CLICKER */
+        #btn-clicker { width: 160px; height: 160px; border-radius: 50%; border: 6px solid var(--accent); background: #161b22; font-size: 4.5rem; cursor: pointer; margin: 20px auto; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(88, 166, 255, 0.2); }
+        #btn-clicker:active { transform: scale(0.92); }
 
         /* CASINO */
-        .slot-machine { background: #000; padding: 20px; border-radius: 20px; border: 4px solid var(--accent); text-align: center; margin-top: 30px; box-shadow: inset 0 0 20px #000; }
-        .slots-window { display: flex; justify-content: center; gap: 10px; font-size: 3.5rem; background: #111; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; overflow: hidden; height: 100px; align-items: center; }
-        .slot-col { width: 60px; text-align: center; }
+        .slot-machine { background: #000; padding: 20px; border-radius: 15px; border: 2px solid var(--gold); text-align: center; }
+        .slot-row { display: flex; justify-content: center; gap: 10px; font-size: 3rem; margin: 15px 0; }
 
-        /* UI ELEMENTS */
-        .btn { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; font-size: 1rem; cursor: pointer; margin-top: 10px; transition: 0.2s; }
-        .btn-primary { background: var(--accent); color: #000; }
-        .btn-primary:active { transform: scale(0.98); background: #e6c200; }
-        .btn-red { background: var(--red); color: white; }
+        /* CHAT */
+        #chat-msgs { height: 250px; overflow-y: auto; background: #010409; padding: 10px; border-radius: 8px; text-align: left; font-size: 0.9rem; }
         
-        input { width: 100%; padding: 15px; background: #222; border: 1px solid #444; color: white; border-radius: 10px; margin-bottom: 10px; font-size: 1rem; outline: none; }
-        input:focus { border-color: var(--accent); }
+        /* FRIENDS */
+        .friend-card { display: flex; justify-content: space-between; background: #1c2128; padding: 10px; border-radius: 6px; margin-bottom: 8px; align-items: center; }
+        .online-dot { width: 8px; height: 8px; background: #238636; border-radius: 50%; display: inline-block; margin-right: 5px; }
 
-        /* NAVBAR */
-        nav { height: 75px; background: var(--panel); border-top: 1px solid #333; display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom); z-index: 100; }
-        .nav-item { text-align: center; font-size: 0.7rem; color: #666; transition: 0.2s; flex: 1; }
-        .nav-item i { display: block; font-size: 1.5rem; margin-bottom: 4px; }
-        .nav-item.active { color: var(--accent); transform: translateY(-3px); }
-
-        /* AUTH */
-        #auth-overlay { position: fixed; inset: 0; background: #000; z-index: 9999; display: flex; align-items: center; justify-content: center; padding: 20px; }
-        .auth-box { width: 100%; max-width: 350px; background: #1a1a1a; padding: 30px; border-radius: 20px; border: 1px solid var(--accent); text-align: center; }
+        #auth-overlay { position: fixed; inset: 0; background: #0d1117; z-index: 9999; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
-    <div id="toast-container"></div>
-
     <div id="auth-overlay">
-        <div class="auth-box">
-            <h1 style="color:var(--accent); margin-top:0">tokagames hub</h1>
-            <p id="auth-err" style="color:var(--red); font-size:0.9rem;"></p>
+        <div style="width: 85%; max-width: 320px; text-align: center;">
+            <h1 style="color:var(--accent)">SOREK HUB V7</h1>
             <input id="u" placeholder="Pseudo">
             <input id="p" type="password" placeholder="Mot de passe">
-            <button class="btn btn-primary" onclick="auth('login')">JOUER</button>
-            <button class="btn" style="background:transparent; color:var(--accent); border:1px solid var(--accent)" onclick="auth('register')">CRÉER COMPTE</button>
+            <button class="btn" onclick="auth('login')">CONNEXION</button>
+            <button class="btn" style="background:none; border:1px solid #30363d" onclick="auth('register')">S'INSCRIRE</button>
         </div>
     </div>
 
     <header>
-        <div>
-            <div class="badge" id="rank-badge">Vagabond</div>
-            <div style="font-size:1.4rem; font-weight:bold; margin-top:2px;"><span id="score-val">0</span> 💰</div>
+        <div class="stat-box">
+            <span id="rank-badge" class="badge">Vagabond</span>
+            <span style="font-size: 1.3rem; font-weight: bold;"><span id="score-val">0</span> 💰</span>
         </div>
-        <div style="text-align:right">
-            <div style="font-size:0.8rem; color:#888;">Guilde</div>
-            <div style="color:var(--accent); font-weight:bold;" id="guild-tag">Aucune</div>
+        <div style="text-align: right;">
+            <div style="font-size: 0.75rem; color: #8b949e;">Guilde</div>
+            <div id="guild-tag" style="color:var(--gold); font-weight: bold;">Aucune</div>
         </div>
     </header>
 
     <main>
         <div id="view-clicker" class="view active">
-            <div id="clicker-container">
-                <button id="btn-clicker" onmousedown="clickAction()">👆</button>
-                <div style="margin-top:20px; text-align:center; width:100%">
-                    <div id="relative-lb-box" style="margin-bottom:20px; font-size:0.9rem; color:#888; background:#151515; padding:10px; border-radius:10px; max-width:300px; margin: 0 auto 20px auto;">
-                        Jouez pour voir le classement...
-                    </div>
-                    <button class="btn btn-primary" style="max-width:300px" onclick="buyUpgrade()">
-                        AMÉLIORER <br><small style="font-weight:normal">Coût: <span id="cost-val">100</span></small>
-                    </button>
-                </div>
-            </div>
+            <button id="btn-clicker" onclick="clickAction()">👆</button>
+            <p>Puissance de clic : <b>x<span id="mult-val">1</span></b></p>
+            <button class="btn" onclick="socket.emit('buy_upgrade')">AMÉLIORER (💰 <span id="cost-val">100</span>)</button>
+            <div id="rel-lb" style="margin-top:20px; font-size:0.85rem; background:rgba(0,0,0,0.2); padding:10px; border-radius:8px;"></div>
         </div>
 
         <div id="view-casino" class="view">
-            <h2 style="text-align:center; color:var(--accent)">JACKPOT SLOTS</h2>
+            <h2 style="color:var(--gold)">SOREK CASINO</h2>
             <div class="slot-machine">
-                <div class="slots-window">
-                    <div class="slot-col" id="s1">🍒</div>
-                    <div class="slot-col" id="s2">🍒</div>
-                    <div class="slot-col" id="s3">🍒</div>
+                <div class="slot-row">
+                    <span id="s1">🎰</span><span id="s2">🎰</span><span id="s3">🎰</span>
                 </div>
-                <p style="color:#888; font-size:0.9rem;">Mise: 500 💰 | Jackpot: x50</p>
-                <button class="btn btn-primary" onclick="spinCasino()" id="btn-spin">TOURNER (500)</button>
+                <button class="btn" style="background:var(--gold); color:black" onclick="spinCasino()" id="btn-spin">MISER 500 💰</button>
             </div>
-            <div id="casino-result" style="text-align:center; margin-top:20px; font-weight:bold; height:20px;"></div>
+        </div>
+
+        <div id="view-guild" class="view">
+            <h3>🛡️ GUILDE</h3>
+            <div id="guild-content">
+                <input id="g-name" placeholder="Nom de la guilde">
+                <button class="btn" onclick="createGuild()">CRÉER GUILDE</button>
+                <hr style="border:0; border-top:1px solid #30363d; margin:20px 0;">
+                <button class="btn" style="background:var(--red)" onclick="socket.emit('trahir_guilde')">TRAHIR LA GUILDE</button>
+            </div>
         </div>
 
         <div id="view-social" class="view">
-            <h3 style="text-align:center">tokasocial hub</h3>
-            <p style="text-align:center; color:#666">Chat et Amis bientôt ici...</p>
+            <h3>👥 AMIS</h3>
+            <div style="display:flex; gap:5px;">
+                <input id="f-name" placeholder="Ajouter un ami..." style="margin:0;">
+                <button class="btn" style="width:50px; margin:0;" onclick="addFriend()">+</button>
+            </div>
+            <div id="friends-list" style="margin-top:10px; max-height:150px; overflow-y:auto;"></div>
+
+            <h3 style="margin-top:20px;">💬 TCHAT GLOBAL</h3>
+            <div id="chat-msgs"></div>
+            <div style="display:flex; gap:5px; margin-top:10px;">
+                <input id="mi" placeholder="Message..." style="margin:0;">
+                <button class="btn" style="width:60px; margin:0;" onclick="sendMsg()">➤</button>
+            </div>
         </div>
     </main>
 
     <nav>
-        <div class="nav-item active" onclick="switchView('clicker', this)"><i>⚡</i>Click</div>
-        <div class="nav-item" onclick="switchView('casino', this)"><i>🎰</i>Casino</div>
-        <div class="nav-item" onclick="switchView('social', this)"><i>👥</i>Social</div>
+        <div class="nav-item active" onclick="showV('clicker', this)"><i>🖱️</i>Click</div>
+        <div class="nav-item" onclick="showV('casino', this)"><i>🎰</i>Casino</div>
+        <div class="nav-item" onclick="showV('guild', this)"><i>🛡️</i>Guilde</div>
+        <div class="nav-item" onclick="showV('social', this)"><i>💬</i>Social</div>
     </nav>
 
     <script>
         const socket = io();
-        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         let myMult = 1;
-
-        // --- SOUND ENGINE (Synthétiseur) ---
-        function playSound(type) {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            if (type === 'click') {
-                osc.frequency.setValueAtTime(600, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
-                osc.start(); osc.stop(audioCtx.currentTime + 0.1);
-            } else if (type === 'coin') {
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(1800, audioCtx.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
-                osc.start(); osc.stop(audioCtx.currentTime + 0.3);
-            } else if (type === 'spin') {
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(200, audioCtx.currentTime);
-                gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
-                osc.start(); osc.stop(audioCtx.currentTime + 0.05);
-            } else if (type === 'win') {
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(500, audioCtx.currentTime);
-                osc.frequency.linearRampToValueAtTime(1000, audioCtx.currentTime + 0.2);
-                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
-                gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
-                osc.start(); osc.stop(audioCtx.currentTime + 0.5);
-            }
-        }
+        let audioCtx = null;
+        let myPseudo = "";
 
         // --- AUTH ---
         function auth(t) {
-            const u = document.getElementById('u').value;
+            const u = document.getElementById('u').value.trim();
             const p = document.getElementById('p').value;
-            if(u && p) socket.emit('login_action', {pseudo: u, password: p, type: t});
+            if(u && p) {
+                myPseudo = u;
+                socket.emit('login_action', {pseudo: u, password: p, type: t});
+            }
         }
-        socket.on('auth_error', m => showToast(m, 'error'));
         socket.on('login_ok', d => {
             document.getElementById('auth-overlay').style.display = 'none';
             updateUI(d);
-            showToast(`Bienvenue ${d.pseudo} !`, 'success');
         });
+        socket.on('auth_error', m => alert(m));
 
-        // --- UI & LOGIC ---
-        let emojis = ["👆", "👊", "🔥", "💎", "👑", "🚀", "🪐", "⚡", "🐲", "🤖"];
-
+        // --- UI CORE ---
         function updateUI(d) {
-            document.getElementById('score-val').innerText = d.clicks;
-            document.getElementById('cost-val').innerText = d.mult * 100;
-            document.getElementById('guild-tag').innerText = d.guild || "Aucune";
-            document.getElementById('rank-badge').innerText = d.rank;
-            myMult = d.mult;
+            if(d.clicks !== undefined) document.getElementById('score-val').innerText = d.clicks;
+            if(d.mult !== undefined) {
+                document.getElementById('mult-val').innerText = d.mult;
+                document.getElementById('cost-val').innerText = d.mult * 100;
+                myMult = d.mult;
+            }
+            if(d.rank) document.getElementById('rank-badge').innerText = d.rank;
+            if(d.guild) document.getElementById('guild-tag').innerText = d.guild;
 
-            // Fix Emoji Logic
-            let scoreInt = parseInt(d.clicks);
-            let idx = Math.floor(scoreInt / 500) % emojis.length;
+            // Emoji update
+            const emojis = ["👆", "👊", "🔥", "💎", "👑", "🚀", "⚡"];
+            let idx = Math.min(Math.floor((d.clicks || 0) / 1000), emojis.length - 1);
             document.getElementById('btn-clicker').innerText = emojis[idx];
         }
 
+        socket.on('update_score', d => updateUI(d));
         socket.on('update_full_state', d => updateUI(d));
-        socket.on('update_score', d => {
-            document.getElementById('score-val').innerText = d.clicks;
-            document.getElementById('rank-badge').innerText = d.rank;
-            
-            // Emoji update live
-            let idx = Math.floor(d.clicks / 500) % emojis.length;
-            document.getElementById('btn-clicker').innerText = emojis[idx];
-        });
 
         // --- CLICKER ---
         function clickAction() {
-            playSound('click');
-            // Animation locale immédiate
             let s = document.getElementById('score-val');
             s.innerText = parseInt(s.innerText) + myMult;
-            
-            // Effet visuel bouton
-            let btn = document.getElementById('btn-clicker');
-            btn.classList.remove('pulse-anim');
-            void btn.offsetWidth; // trigger reflow
-            btn.classList.add('pulse-anim');
-
             socket.emit('add_click');
         }
 
-        function buyUpgrade() {
-            socket.emit('buy_upgrade');
-            // Le son 'coin' sera joué si succès via le notif
-        }
-
-        // --- CASINO ANIMATION ---
-        let spinning = false;
+        // --- CASINO ---
         function spinCasino() {
-            if(spinning) return;
-            let currentScore = parseInt(document.getElementById('score-val').innerText);
-            if(currentScore < 500) return showToast("Pas assez d'argent !", "error");
-
-            spinning = true;
-            document.getElementById('btn-spin').disabled = true;
-            document.getElementById('casino-result').innerText = "";
             socket.emit('spin_wheel');
-            
-            // Animation Loop
-            let slots = [document.getElementById('s1'), document.getElementById('s2'), document.getElementById('s3')];
-            let symbols = ["🍒", "🍋", "🍇", "💎", "7️⃣"];
-            
-            let interval = setInterval(() => {
-                slots.forEach(s => s.innerText = symbols[Math.floor(Math.random() * symbols.length)]);
-                playSound('spin');
+            let anim = setInterval(() => {
+                const syms = ["🍒","🍋","💎","7️⃣","🎰"];
+                document.getElementById('s1').innerText = syms[Math.floor(Math.random()*5)];
+                document.getElementById('s2').innerText = syms[Math.floor(Math.random()*5)];
+                document.getElementById('s3').innerText = syms[Math.floor(Math.random()*5)];
             }, 100);
 
-            // Attente du résultat
             socket.once('spin_result', d => {
-                setTimeout(() => { // On laisse tourner un peu pour le suspense (1.5s)
-                    clearInterval(interval);
-                    spinning = false;
-                    document.getElementById('btn-spin').disabled = false;
-
-                    // Affichage résultat
-                    let resSym = d.outcome === 'perdu' ? ["❌","❌","❌"] : 
-                                 d.outcome === 'x2' ? ["🍒","🍒","🍒"] : 
-                                 d.outcome === 'x5' ? ["💎","💎","💎"] : ["👑","👑","👑"];
-                    
-                    if(d.outcome === 'perdu') { // Perdu : on mélange
-                         slots[0].innerText = "❌"; slots[1].innerText = "🍋"; slots[2].innerText = "🍇";
-                         showToast("Perdu...", "error");
-                    } else {
-                        slots.forEach((s, i) => s.innerText = resSym[i]);
-                        playSound('win');
-                        showToast(`GAGNÉ ! +${d.gain}`, "success");
-                    }
-                }, 1500);
+                setTimeout(() => {
+                    clearInterval(anim);
+                    const res = d.outcome === 'perdu' ? ["❌","🍋","🍒"] : ["💎","💎","💎"];
+                    document.getElementById('s1').innerText = res[0];
+                    document.getElementById('s2').innerText = res[1];
+                    document.getElementById('s3').innerText = res[2];
+                    alert(d.outcome === 'perdu' ? "Perdu !" : "GAGNÉ !");
+                }, 1000);
             });
         }
 
-        // --- TOAST SYSTEM (Popups) ---
-        function showToast(msg, type) {
-            const box = document.createElement('div');
-            box.className = `toast ${type}`;
-            box.innerText = msg;
-            document.getElementById('toast-container').appendChild(box);
-            
-            // Trigger animation
-            setTimeout(() => box.classList.add('show'), 10);
-            
-            // Auto remove
-            setTimeout(() => {
-                box.classList.remove('show');
-                setTimeout(() => box.remove(), 300);
-            }, 3000);
-
-            if(type === 'success') playSound('coin');
+        // --- GUILDES ---
+        function createGuild() {
+            const n = document.getElementById('g-name').value;
+            if(n) socket.emit('create_guild', {name: n});
         }
 
-        socket.on('notif_success', m => showToast(m, 'success'));
-        socket.on('notif_error', m => showToast(m, 'error'));
+        // --- SOCIAL (CHAT & AMIS) ---
+        function sendMsg() {
+            const i = document.getElementById('mi');
+            if(i.value) socket.emit('msg', {m: i.value});
+            i.value = "";
+        }
+        socket.on('new_msg', d => {
+            const b = document.getElementById('chat-msgs');
+            b.innerHTML += `<div><small>[${d.r}]</small> <b>${d.p}:</b> ${d.m}</div>`;
+            b.scrollTop = b.scrollHeight;
+        });
 
-        // --- NAV ---
-        function switchView(id, el) {
+        function addFriend() {
+            const n = document.getElementById('f-name').value;
+            if(n) socket.emit('add_friend', {target: n});
+            document.getElementById('f-name').value = "";
+        }
+        socket.on('update_friends', d => {
+            const list = document.getElementById('friends-list');
+            list.innerHTML = d.friends.map(f => `
+                <div class="friend-card">
+                    <span><span class="online-dot" style="background:${f.online?'#238636':'#8b949e'}"></span>${f.name}</span>
+                    <small>${f.online ? 'En ligne' : 'Hors ligne'}</small>
+                </div>
+            `).join('');
+        });
+
+        // --- NAVIGATION ---
+        function showV(id, el) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('view-'+id).classList.add('active');
             el.classList.add('active');
         }
 
-        socket.on('relative_lb', d => {
-            const box = document.getElementById('relative-lb-box');
-            box.innerHTML = d.lb.map(u => `
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #222; padding:4px;">
-                    <span style="${u.pseudo === document.getElementById('u').value ? 'color:var(--accent)':''}">${u.pseudo}</span>
-                    <span>${u.clicks}</span>
-                </div>
-            `).join('');
-        });
+        function clickAction() {
+            let s = document.getElementById('score-val');
+            s.innerText = parseInt(s.innerText) + myMult;
+            socket.emit('add_click');
+        }
     </script>
 </body>
 </html>
