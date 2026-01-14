@@ -330,43 +330,32 @@ def send_friend_request(data):
     from flask import request
     try:
         user_data = connected_users.get(request.sid)
-        if not user_data:
-            return
+        if not user_data: return
         
-        from_pseudo = user_data['pseudo']
-        to_pseudo = data['target'].strip()
+        target = data['target'].strip()
+        pseudo = user_data['pseudo']
+
+        if target == pseudo:
+            return emit('error', "Tu ne peux pas t'ajouter toi-même")
+
+        # ON UTILISE "friendships" AU LIEU DE "friend_requests"
+        res = supabase.table("friendships").select("*").or_(f'and(user1.eq."{pseudo}",user2.eq."{target}"),and(user1.eq."{target}",user2.eq."{pseudo}")').execute()
         
-        # Vérifie que le joueur existe
-        target_user = get_user_data(to_pseudo)
-        if not target_user:
-            return emit('error', 'Ce joueur n\'existe pas !')
-        
-        # Vérifie qu'ils ne sont pas déjà amis
-        existing = supabase.table("friendships").select("*").or_(
-            f"and(user1.eq.{from_pseudo},user2.eq.{to_pseudo}),and(user1.eq.{to_pseudo},user2.eq.{from_pseudo})"
-        ).execute()
-        
-        if existing.data:
-            return emit('error', 'Vous êtes déjà amis ou une demande existe déjà !')
-        
-        # Crée la demande
-        supabase.table("friend_requests").insert({
-            "from_pseudo": from_pseudo,
-            "to_pseudo": to_pseudo,
-            "status": "pending"
+        if res.data:
+            return emit('error', "Déjà amis ou demande en cours")
+
+        # INSERTION DANS LA BONNE TABLE
+        supabase.table("friendships").insert({
+            "user1": pseudo, 
+            "user2": target, 
+            "status": "accepted"
         }).execute()
         
-        emit('success', f'Demande envoyée à {to_pseudo} ! 📬')
-        
-        # Notifie le destinataire s'il est connecté
-        for sid, u in connected_users.items():
-            if u['pseudo'] == to_pseudo:
-                socketio.emit('notif', f'{from_pseudo} t\'a envoyé une demande d\'ami !', room=sid)
-                break
-        
+        emit('success', f"Ami ajouté : {target}")
+        socketio.emit('get_friends', room=request.sid) # Force le rafraîchissement
     except Exception as e:
-        print(f"Erreur send_friend_request: {e}")
-        emit('error', 'Erreur serveur')
+        print(f"Erreur friend_request: {e}")
+        emit('error', "Utilisateur introuvable")
 
 @socketio.on('get_requests')
 def get_requests():
@@ -506,6 +495,7 @@ def on_disconnect():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
 
 
 
