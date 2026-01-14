@@ -23,17 +23,11 @@ def get_rank(clicks):
     return "Vagabond"
 
 def update_social_data(pseudo):
-    """Envoie les listes d'amis, requêtes et invitations à un joueur précis"""
     try:
-        # Amis acceptés
         res_f = supabase.table("friendships").select("*").eq("status", "accepted").or_(f'user1.eq."{pseudo}",user2.eq."{pseudo}"').execute()
         friends = [f['user2'] if f['user1'] == pseudo else f['user1'] for f in res_f.data]
-        
-        # Demandes d'amis reçues
         res_r = supabase.table("friendships").select("*").eq("status", "pending").eq("user2", pseudo).execute()
         requests = [r['user1'] for r in res_r.data]
-
-        # Invitations de guilde
         res_g = supabase.table("guild_invites").select("*").eq("target_user", pseudo).execute()
         guild_invites = [g['guild_name'] for g in res_g.data]
 
@@ -71,10 +65,32 @@ def auth_logic(data):
 def add_click():
     u = connected_users.get(request.sid)
     if u:
-        res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
-        nv = res.data[0]['clicks'] + u['mult']
-        supabase.table("users").update({"clicks": nv}).eq("pseudo", u['pseudo']).execute()
-        emit('update_score', {'clicks': nv, 'rank': get_rank(nv)})
+        try:
+            res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
+            nv = res.data[0]['clicks'] + u['mult']
+            supabase.table("users").update({"clicks": nv}).eq("pseudo", u['pseudo']).execute()
+            emit('update_score', {'clicks': nv, 'rank': get_rank(nv)})
+        except: pass
+
+# --- FONCTION BOOSTER RÉPARÉE ---
+@socketio.on('buy_upgrade')
+def buy_up():
+    u = connected_users.get(request.sid)
+    if u:
+        try:
+            res = supabase.table("users").select("clicks", "multiplier").eq("pseudo", u['pseudo']).execute()
+            c, m = res.data[0]['clicks'], res.data[0]['multiplier']
+            cost = m * 100
+            if c >= cost:
+                new_c, new_m = c - cost, m + 1
+                supabase.table("users").update({"clicks": new_c, "multiplier": new_m}).eq("pseudo", u['pseudo']).execute()
+                connected_users[request.sid]['mult'] = new_m
+                emit('update_full_state', {'clicks': new_c, 'mult': new_m, 'rank': get_rank(new_c)})
+                emit('success', "Booster acheté ! 🚀")
+            else:
+                emit('error', f"Pas assez de clics ({cost} requis)")
+        except Exception as e:
+            print(f"Erreur upgrade: {e}")
 
 @socketio.on('send_friend_request')
 def send_friend(data):
@@ -124,11 +140,4 @@ def handle_msg(data):
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
-
-
-
-
-
-
-
 
