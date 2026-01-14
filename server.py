@@ -10,8 +10,8 @@ bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- CONFIG SUPABASE (Remets tes clés) ---
-SUPABASE_URL = "https://TON_ID.supabase.co"
-SUPABASE_KEY = "TA_CLE_SERVICE_ROLE"
+SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
+SUPABASE_KEY = "sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 connected_users = {} 
@@ -93,5 +93,6 @@ def spin():
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
+
 
 
