@@ -3,297 +3,222 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sorek Hub V5 - Cloud Edition</title>
+    <title>Sorek Hub V6 - Ultimate</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        :root { 
-            --bg: #0d1117; 
-            --panel: #161b22; 
-            --accent: #58a6ff; 
-            --border: #30363d; 
-            --red: #f85149; 
-            --gold: #f1c40f;
-        }
-
+        :root { --bg: #121212; --panel: #1e1e1e; --accent: #bb86fc; --gold: #ffd700; --green: #03dac6; --red: #cf6679; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        body { 
-            background: var(--bg); 
-            color: #c9d1d9; 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-            margin: 0; 
-            /* Fix crucial pour mobile : utilise la hauteur dynamique du navigateur */
-            height: 100dvh; 
-            display: flex; 
-            flex-direction: column; 
-            overflow: hidden; 
-        }
-
-        /* AUTH OVERLAY */
-        #auth-overlay { 
-            position: fixed; inset: 0; background: #000; z-index: 3000; 
-            display: flex; align-items: center; justify-content: center; padding: 20px; 
-        }
-        .auth-box { 
-            background: var(--panel); padding: 25px; border-radius: 15px; 
-            border: 1px solid var(--accent); width: 100%; max-width: 350px; 
-        }
+        body { background: var(--bg); color: #e0e0e0; font-family: 'Fredoka', sans-serif; margin: 0; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
 
         /* HEADER */
-        header { 
-            padding: 15px 20px; background: var(--panel); 
-            border-bottom: 1px solid var(--border); 
-            display: flex; justify-content: space-between; align-items: center;
-            padding-top: env(safe-area-inset-top, 15px);
-        }
+        header { padding: 15px; background: var(--panel); border-bottom: 2px solid #333; display: flex; justify-content: space-between; align-items: center; padding-top: env(safe-area-inset-top, 15px); }
+        #rank-badge { font-size: 0.7rem; background: var(--accent); color: black; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 5px; }
 
-        /* MAIN CONTENT */
-        main { 
-            flex: 1; position: relative; overflow-y: auto; 
-            display: flex; flex-direction: column;
-        }
-        .view { display: none; padding: 20px; width: 100%; }
+        /* MAIN */
+        main { flex: 1; overflow-y: auto; position: relative; }
+        .view { display: none; padding: 20px; animation: fadeIn 0.3s; }
         .view.active { display: block; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
 
         /* CLICKER */
-        #btn-clicker { 
-            width: 180px; height: 180px; border-radius: 50%; 
-            border: 10px solid var(--accent); background: var(--panel); 
-            font-size: 4.5rem; cursor: pointer; transition: transform 0.1s; 
-            display: flex; align-items: center; justify-content: center; 
-            margin: 30px auto; color: white; box-shadow: 0 0 20px rgba(88, 166, 255, 0.2);
-        }
-        #btn-clicker:active { transform: scale(0.9); }
+        #btn-clicker { width: 160px; height: 160px; border-radius: 50%; border: 8px solid var(--accent); background: radial-gradient(circle, #333 0%, #1e1e1e 100%); font-size: 4rem; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 20px auto; color: white; box-shadow: 0 0 25px rgba(187, 134, 252, 0.3); }
+        #btn-clicker:active { transform: scale(0.92); border-color: white; }
 
-        #relative-lb { 
-            background: rgba(0,0,0,0.3); border-radius: 12px; 
-            padding: 12px; font-size: 0.85rem; width: 100%; max-width: 320px; margin: 0 auto; 
-        }
-        .lb-row { display: flex; justify-content: space-between; padding: 5px 8px; border-radius: 6px; }
-        .is-me { background: var(--accent); color: white; font-weight: bold; }
+        /* CASINO */
+        .slot-machine { background: #000; padding: 20px; border-radius: 15px; border: 4px solid var(--gold); text-align: center; margin-top: 20px; }
+        #slot-display { font-size: 3rem; margin: 20px 0; min-height: 60px; }
+        .btn-gold { background: var(--gold); color: black; }
 
-        /* NAVBAR MOBILE (CORRIGÉ) */
-        nav { 
-            height: 80px; 
-            background: var(--panel); 
-            border-top: 1px solid var(--border); 
-            display: flex; 
-            justify-content: space-around; 
-            align-items: center;
-            padding-bottom: env(safe-area-inset-bottom, 10px);
-            z-index: 1000;
-            flex-shrink: 0;
-        }
-        .nav-item { 
-            flex: 1; text-align: center; color: #8b949e; 
-            cursor: pointer; font-size: 0.75rem; font-weight: bold;
-            display: flex; flex-direction: column; gap: 4px;
-        }
-        .nav-item i { font-size: 1.5rem; }
-        .nav-item.active { color: var(--accent); }
+        /* FRIENDS */
+        .friend-item { display: flex; justify-content: space-between; background: #2c2c2c; padding: 10px; margin-bottom: 8px; border-radius: 8px; align-items: center; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .online { background: var(--green); box-shadow: 0 0 5px var(--green); }
+        .offline { background: var(--red); }
 
-        /* ÉLÉMENTS UI */
-        .btn { 
-            background: var(--accent); border: none; padding: 14px; 
-            color: white; border-radius: 10px; font-weight: bold; 
-            width: 100%; cursor: pointer; margin-top: 10px; font-size: 1rem;
-        }
-        .btn-red { background: var(--red); }
-        input { 
-            background: #000; border: 1px solid var(--border); 
-            color: white; padding: 14px; border-radius: 10px; 
-            width: 100%; margin-bottom: 12px; font-size: 1rem;
-        }
+        /* UI ELEMENTS */
+        .btn { background: var(--accent); border: none; padding: 12px; color: black; border-radius: 8px; font-weight: 600; width: 100%; margin-top: 10px; font-family: inherit; }
+        input { background: #2c2c2c; border: 1px solid #444; color: white; padding: 12px; border-radius: 8px; width: 100%; margin-bottom: 10px; outline: none; }
+        input:focus { border-color: var(--accent); }
 
-        #chat-msgs { 
-            height: 300px; overflow-y: auto; background: rgba(0,0,0,0.4); 
-            padding: 15px; border-radius: 12px; border: 1px solid var(--border);
-        }
+        /* NAVBAR */
+        nav { height: 70px; background: var(--panel); display: flex; justify-content: space-around; align-items: center; padding-bottom: env(safe-area-inset-bottom, 5px); border-top: 1px solid #333; }
+        .nav-item { flex: 1; text-align: center; color: #888; font-size: 0.7rem; cursor: pointer; transition: 0.2s; }
+        .nav-item i { font-size: 1.4rem; display: block; margin-bottom: 3px; }
+        .nav-item.active { color: var(--accent); transform: translateY(-2px); }
+
+        #auth-overlay { position: fixed; inset: 0; background: #000; z-index: 999; display: flex; align-items: center; justify-content: center; }
+        .auth-box { background: var(--panel); padding: 30px; border-radius: 20px; width: 85%; max-width: 350px; text-align: center; border: 1px solid var(--accent); }
     </style>
 </head>
 <body>
 
     <div id="auth-overlay">
         <div class="auth-box">
-            <h2 style="text-align:center; color:var(--accent); margin-top:0;">SOREK HUB V5</h2>
-            <p id="auth-err" style="color:var(--red); text-align:center; font-size:0.85rem; min-height:1.2rem;"></p>
-            <input id="u" placeholder="Pseudo" autocomplete="off">
+            <h1 style="color:var(--accent); margin-top:0">SOREK HUB</h1>
+            <p id="auth-err" style="color:var(--red)"></p>
+            <input id="u" placeholder="Ton Pseudo">
             <input id="p" type="password" placeholder="Mot de passe">
-            <button class="btn" onclick="auth('login')">CONNEXION</button>
-            <button class="btn" style="background:none; border:1px solid var(--accent); color:var(--accent)" onclick="auth('register')">S'INSCRIRE</button>
+            <button class="btn" onclick="auth('login')">JOUER</button>
+            <button class="btn" style="background:transparent; color:var(--accent); border:1px solid var(--accent)" onclick="auth('register')">CRÉER COMPTE</button>
         </div>
     </div>
 
     <header>
-        <div id="score-val" style="font-weight:bold; color:var(--accent); font-size:1.3rem;">0 💰</div>
-        <div id="guild-tag" style="font-size:0.85rem; font-weight:bold; color:var(--gold);">Sans Guilde</div>
+        <div>
+            <span id="rank-badge">...</span>
+            <span id="score-val" style="font-weight:bold; font-size:1.2rem;">0</span> 💰
+        </div>
+        <div id="guild-tag" style="font-size:0.8rem; color:#888;">Solo</div>
     </header>
 
     <main>
         <div id="view-clicker" class="view active" style="text-align:center">
-            <div id="mult-val" style="font-size:1rem; opacity:0.8;">Puissance: x1</div>
             <button id="btn-clicker" onclick="clickAction()">👆</button>
-            
-            <div id="relative-lb">
-                <div style="font-weight:bold; margin-bottom:8px; border-bottom:1px solid var(--border); padding-bottom:5px;">CLASSEMENT PROCHE</div>
+            <div style="background:#2c2c2c; padding:10px; border-radius:10px; margin:20px;">
+                <h4 style="margin:0 0 10px 0; color:#888">Classement Proche</h4>
                 <div id="rel-rows"></div>
             </div>
-            
-            <button class="btn" style="max-width:280px; margin-top:20px;" onclick="socket.emit('buy_upgrade')">
-                BOUTIQUE (💰 <span id="cost-val">100</span>)
-            </button>
+            <button class="btn" onclick="socket.emit('buy_upgrade')">UPGRADE (Coût: <span id="cost-val">100</span>)</button>
         </div>
 
-        <div id="view-lb" class="view">
-            <h3 style="margin-top:0">🏆 CLASSEMENTS LIVE</h3>
-            <div id="lb-content">Chargement des données...</div>
+        <div id="view-casino" class="view">
+            <h2 style="text-align:center; color:var(--gold)">SOREK CASINO 🎰</h2>
+            <div class="slot-machine">
+                <div id="slot-display">🍒 🍒 🍒</div>
+                <p style="font-size:0.8rem; color:#888">Coût: 500 clics</p>
+                <button class="btn btn-gold" onclick="spinWheel()">LANCER (500💰)</button>
+            </div>
+            <p id="casino-msg" style="text-align:center; margin-top:20px; font-weight:bold;"></p>
         </div>
 
-        <div id="view-guild" class="view">
-            <h3 style="margin-top:0">🛡️ MA GUILDE</h3>
-            <div id="guild-setup">
-                <p style="font-size:0.9rem">Créez une guilde pour cumuler vos scores !</p>
-                <input id="g-name" placeholder="Nom de votre guilde">
-                <button class="btn" onclick="createGuild()">CRÉER LA GUILDE</button>
+        <div id="view-friends" class="view">
+            <h3>👥 MES AMIS</h3>
+            <div style="display:flex; gap:5px;">
+                <input id="friend-input" placeholder="Pseudo de l'ami...">
+                <button class="btn" style="width:60px; margin-top:0" onclick="addFriend()">+</button>
             </div>
-            
-            <div style="margin-top:50px; padding:15px; border:1px solid var(--red); border-radius:10px;">
-                <h4 style="color:var(--red); margin-top:0;">ZONE DE TRAHISON</h4>
-                <p style="font-size:0.8rem">En trahissant, vous quittez votre guilde mais vos clics et votre puissance tombent à ZERO.</p>
-                <button class="btn btn-red" onclick="trahir()">TRAHIR LA GUILDE</button>
-            </div>
+            <div id="requests-box"></div>
+            <div id="friends-list" style="margin-top:20px;"></div>
         </div>
 
         <div id="view-chat" class="view">
-            <h3 style="margin-top:0">💬 TCHAT GLOBAL</h3>
-            <div id="chat-msgs"></div>
-            <div style="display:flex; margin-top:12px; gap:8px;">
-                <input id="mi" placeholder="Message..." style="margin:0; flex:1;">
-                <button class="btn" style="width:70px; margin:0;" onclick="sendMsg()">ENVOI</button>
+            <h3>💬 GLOBAL</h3>
+            <div id="chat-msgs" style="height:350px; overflow-y:auto; background:#000; padding:10px; border-radius:10px;"></div>
+            <div style="display:flex; margin-top:10px; gap:10px;">
+                <input id="mi" placeholder="Message..." style="margin:0;">
+                <button class="btn" style="width:60px; margin:0;" onclick="sendMsg()">➤</button>
             </div>
         </div>
     </main>
 
     <nav>
-        <div class="nav-item active" onclick="showView('clicker', this)"><i>🖱️</i>Click</div>
-        <div class="nav-item" onclick="showView('lb', this); socket.emit('get_full_lb')"><i>🏆</i>Rangs</div>
-        <div class="nav-item" onclick="showView('guild', this)"><i>🛡️</i>Guilde</div>
+        <div class="nav-item active" onclick="showView('clicker', this)"><i>⚡</i>Click</div>
+        <div class="nav-item" onclick="showView('casino', this)"><i>🎰</i>Casino</div>
+        <div class="nav-item" onclick="showView('friends', this)"><i>👥</i>Amis</div>
         <div class="nav-item" onclick="showView('chat', this)"><i>💬</i>Chat</div>
     </nav>
 
     <script>
         const socket = io();
         let myPseudo = "";
-        let emojis = ["👆", "🔥", "💎", "⭐", "🚀", "👑", "🍀", "👻", "👽", "🤖"];
 
-        // --- AUTH ---
+        // AUTH
         function auth(t) {
-            const u = document.getElementById('u').value.trim();
+            const u = document.getElementById('u').value;
             const p = document.getElementById('p').value;
-            if(!u || !p) return alert("Champs vides !");
-            socket.emit('login_action', {pseudo: u, password: p, type: t});
+            if(u && p) socket.emit('login_action', {pseudo: u, password: p, type: t});
         }
-
+        socket.on('auth_error', m => document.getElementById('auth-err').innerText = m);
+        socket.on('notif', m => alert(m));
+        
         socket.on('login_ok', d => {
             myPseudo = d.pseudo;
             document.getElementById('auth-overlay').style.display = 'none';
             updateUI(d);
         });
 
-        socket.on('auth_error', m => document.getElementById('auth-err').innerText = m);
+        function updateUI(d) {
+            document.getElementById('score-val').innerText = d.clicks;
+            document.getElementById('cost-val').innerText = d.mult * 100;
+            document.getElementById('guild-tag').innerText = d.guild || "Sans Guilde";
+            document.getElementById('rank-badge').innerText = d.rank;
+        }
 
-        // --- CLICKER ---
+        // CLICKER
         function clickAction() {
             socket.emit('add_click');
-            // Animation locale immédiate pour le feeling
-            let sVal = document.getElementById('score-val');
-            let current = parseInt(sVal.innerText);
-            updateEmoji(current);
+            let s = document.getElementById('score-val');
+            s.innerText = parseInt(s.innerText) + 1; // Simulation visuelle
         }
-
         socket.on('update_score', d => {
-            document.getElementById('score-val').innerText = d.clicks + " 💰";
+            document.getElementById('score-val').innerText = d.clicks;
+            document.getElementById('rank-badge').innerText = d.rank;
         });
 
-        function updateUI(d) {
-            document.getElementById('score-val').innerText = d.clicks + " 💰";
-            document.getElementById('mult-val').innerText = "Puissance: x" + d.mult;
-            document.getElementById('cost-val').innerText = d.mult * 100;
-            document.getElementById('guild-tag').innerText = d.guild ? "🛡️ " + d.guild : "Sans Guilde";
-            updateEmoji(d.clicks);
+        // CASINO
+        function spinWheel() {
+            document.getElementById('slot-display').innerText = "🎰 🎰 🎰";
+            socket.emit('spin_wheel');
         }
+        socket.on('spin_result', d => {
+            const disp = document.getElementById('slot-display');
+            const msg = document.getElementById('casino-msg');
+            
+            if(d.outcome === 'perdu') { disp.innerText = "❌ ❌ ❌"; msg.innerText = "Perdu... (-500)"; msg.style.color = "var(--red)"; }
+            else if(d.outcome === 'x2') { disp.innerText = "🍒 🍒 🍒"; msg.innerText = "GAGNÉ ! (+1000)"; msg.style.color = "var(--green)"; }
+            else if(d.outcome === 'x5') { disp.innerText = "💎 💎 💎"; msg.innerText = "GROS LOT ! (+2500)"; msg.style.color = "var(--gold)"; }
+            else { disp.innerText = "👑 👑 👑"; msg.innerText = "JACKPOT !!! (+25000)"; msg.style.color = "orange"; }
+        });
 
-        function updateEmoji(s) {
-            let i = Math.floor(s / 500) % emojis.length;
-            document.getElementById('btn-clicker').innerText = emojis[i];
-        }
+        // AMIS
+        function addFriend() { socket.emit('add_friend', {target: document.getElementById('friend-input').value}); }
+        socket.on('update_friends', d => {
+            const reqBox = document.getElementById('requests-box');
+            reqBox.innerHTML = d.requests.map(r => `
+                <div class="friend-item" style="border:1px solid var(--accent)">
+                    <span>Demande de: <b>${r}</b></span>
+                    <button class="btn" style="width:auto; margin:0; padding:5px 10px;" onclick="socket.emit('accept_friend', {target:'${r}'})">Accepter</button>
+                </div>
+            `).join('');
 
-        // --- NAVIGATION ---
-        function showView(id, el) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById('view-' + id).classList.add('active');
-            el.classList.add('active');
-        }
-
-        // --- CLASSEMENTS ---
-        socket.on('relative_lb', d => {
-            const rows = document.getElementById('rel-rows');
-            rows.innerHTML = d.lb.map(u => `
-                <div class="lb-row ${u.pseudo === myPseudo ? 'is-me' : ''}">
-                    <span>#${d.pos + (d.lb.indexOf(u) - d.lb.findIndex(x => x.pseudo === myPseudo))} ${u.pseudo}</span>
-                    <span>${u.clicks}</span>
+            const listBox = document.getElementById('friends-list');
+            listBox.innerHTML = d.friends.map(f => `
+                <div class="friend-item">
+                    <div>
+                        <span class="status-dot ${f.online ? 'online':'offline'}"></span>
+                        ${f.name}
+                    </div>
+                    <small style="color:#666">${f.online ? 'En ligne' : 'Absent'}</small>
                 </div>
             `).join('');
         });
 
-        socket.on('full_lb_data', d => {
-            let html = "<h4 style='color:var(--accent)'>TOP 20 JOUEURS</h4>";
-            d.users.forEach((u, i) => {
-                html += `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #1c2128;">
-                    <span>${i+1}. ${u.pseudo}</span><span style="color:var(--accent)">${u.clicks}</span>
-                </div>`;
-            });
-            html += "<h4 style='color:var(--gold); margin-top:25px;'>TOP GUILDES</h4>";
-            d.guilds.forEach((g, i) => {
-                html += `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #1c2128;">
-                    <span>${i+1}. ${g.name}</span><span style="color:var(--gold)">${g.total_clicks}</span>
-                </div>`;
-            });
-            document.getElementById('lb-content').innerHTML = html;
-        });
-
-        // --- GUILDES ---
-        function createGuild() {
-            const n = document.getElementById('g-name').value.trim();
-            if(n) socket.emit('create_guild', {name: n});
-        }
-
-        function trahir() {
-            if(confirm("ATTENTION : Tu vas quitter ta guilde et tes clics retomberont à ZERO. Es-tu sûr ?")) {
-                socket.emit('trahir_guilde');
-            }
-        }
-
-        // --- CHAT ---
-        function sendMsg() {
-            const i = document.getElementById('mi');
-            if(i.value.trim()) socket.emit('msg', {m: i.value});
+        // CHAT & NAVIGATION
+        function sendMsg() { 
+            let i = document.getElementById('mi');
+            if(i.value) socket.emit('msg', {m: i.value}); 
             i.value = "";
         }
-
         socket.on('new_msg', d => {
-            const box = document.getElementById('chat-msgs');
-            const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            box.innerHTML += `<div style="margin-bottom:8px; font-size:0.9rem;">
-                <small style="opacity:0.5">${time}</small> <b style="color:var(--accent)">${d.p}:</b> ${d.m}
-            </div>`;
-            box.scrollTop = box.scrollHeight;
+            let b = document.getElementById('chat-msgs');
+            b.innerHTML += `<div style="margin-bottom:5px"><span style="font-size:0.7rem; background:#333; padding:2px; border-radius:3px;">${d.r}</span> <b>${d.p}:</b> ${d.m}</div>`;
+            b.scrollTop = b.scrollHeight;
         });
 
-        // Fix pour l'envoi de message avec la touche Entrée sur mobile
-        document.getElementById('mi').addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') sendMsg();
+        function showView(id, el) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById('view-'+id).classList.add('active');
+            el.classList.add('active');
+        }
+
+        socket.on('relative_lb', d => {
+            document.getElementById('rel-rows').innerHTML = d.lb.map(u => `
+                <div style="display:flex; justify-content:space-between; padding:5px; ${u.pseudo === myPseudo ? 'color:var(--accent)':''}">
+                    <span>${u.pseudo}</span><span>${u.clicks}</span>
+                </div>
+            `).join('');
         });
     </script>
 </body>
