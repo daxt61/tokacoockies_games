@@ -51,7 +51,7 @@ def auth_logic(data):
             connected_users[request.sid] = {'pseudo': p, 'mult': user['multiplier'], 'guild': user.get('guild_name')}
             join_room(p) # Le joueur rejoint une "room" à son nom pour recevoir des notifs privées
             emit('login_ok', {
-                'pseudo': p, 'clicks': user['clicks'], 'mult': user['multiplier'], 
+                'pseudo': p, 'clicks': user['clicks'], 'mult': user['multiplier'],
                 'guild': user.get('guild_name'), 'rank': get_rank(user['clicks'])
             })
             send_leaderboard()
@@ -72,7 +72,7 @@ def add_click():
             nv = res.data[0]['clicks'] + u['mult']
             supabase.table("users").update({"clicks": nv}).eq("pseudo", u['pseudo']).execute()
             emit('update_score', {'clicks': nv, 'rank': get_rank(nv)})
-            
+
             # Contribution guilde
             if u.get('guild'):
                 supabase.rpc('increment_guild_clicks', {'guild_name': u['guild'], 'amount': u['mult']}).execute()
@@ -101,7 +101,7 @@ def update_social_data(pseudo):
         # 1. Liste d'amis (acceptés)
         res_friends = supabase.table("friendships").select("*").eq("status", "accepted").or_(f'user1.eq."{pseudo}",user2.eq."{pseudo}"').execute()
         friends = [f['user2'] if f['user1'] == pseudo else f['user1'] for f in res_friends.data]
-        
+
         # 2. Requêtes d'amis reçues (pending)
         res_req = supabase.table("friendships").select("*").eq("status", "pending").eq("user2", pseudo).execute()
         friend_requests = [r['user1'] for r in res_req.data]
@@ -118,6 +118,12 @@ def update_social_data(pseudo):
     except Exception as e:
         print(f"Social Update Error: {e}")
 
+@socketio.on('get_social_data')
+def get_social_data():
+    u = connected_users.get(request.sid)
+    if u:
+        update_social_data(u['pseudo'])
+
 # === SOCIAL : GESTION AMIS ===
 @socketio.on('send_friend_request')
 def send_friend_req(data):
@@ -133,7 +139,7 @@ def send_friend_req(data):
         # Création demande
         supabase.table("friendships").insert({"user1": u['pseudo'], "user2": target, "status": "pending"}).execute()
         emit('success', f"Demande envoyée à {target}")
-        
+
         # Notifie le destinataire
         update_social_data(target)
     except: emit('error', "Joueur introuvable")
@@ -143,7 +149,7 @@ def respond_friend(data):
     u = connected_users.get(request.sid)
     target = data['target']
     action = data['action'] # 'accept' ou 'decline'
-    
+
     try:
         if action == 'accept':
             supabase.table("friendships").update({"status": "accepted"}).match({"user1": target, "user2": u['pseudo']}).execute()
@@ -151,7 +157,7 @@ def respond_friend(data):
         else:
             supabase.table("friendships").delete().match({"user1": target, "user2": u['pseudo']}).execute()
             emit('success', "Demande refusée")
-            
+
         update_social_data(u['pseudo'])
         update_social_data(target)
     except: pass
@@ -185,7 +191,7 @@ def invite_guild(data):
     u = connected_users.get(request.sid)
     target = data['target']
     if not u.get('guild'): return emit('error', "Tu n'as pas de guilde !")
-    
+
     try:
         supabase.table("guild_invites").insert({"guild_name": u['guild'], "target_user": target}).execute()
         emit('success', f"Invitation envoyée à {target}")
@@ -197,14 +203,14 @@ def respond_guild(data):
     u = connected_users.get(request.sid)
     guild_name = data['guild_name']
     action = data['action']
-    
+
     try:
         if action == 'accept':
             supabase.table("users").update({"guild_name": guild_name}).eq("pseudo", u['pseudo']).execute()
             connected_users[request.sid]['guild'] = guild_name
             emit('update_full_state', {'guild': guild_name})
             emit('success', f"Bienvenue chez {guild_name} !")
-            
+
         # Dans tous les cas on supprime l'invitation
         supabase.table("guild_invites").delete().match({"guild_name": guild_name, "target_user": u['pseudo']}).execute()
         update_social_data(u['pseudo'])
@@ -219,11 +225,3 @@ def handle_msg(data):
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000)
-
-
-
-
-
-
-
-
