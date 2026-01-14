@@ -436,44 +436,45 @@ def decline_friend_request(data):
     except Exception as e:
         print(f"Erreur decline_friend_request: {e}")
 
+@socketio.on('send_friend_request')
+def send_friend_request(data):
+    from flask import request
+    try:
+        user_data = connected_users.get(request.sid)
+        target = data['target'].strip()
+        pseudo = user_data['pseudo']
+
+        if target == pseudo:
+            return emit('error', "Tu ne peux pas t'ajouter toi-même")
+
+        # Correction : ajout des guillemets pour que Supabase comprenne que c'est du texte
+        res = supabase.table("friendships").select("*").or_(f'and(user1.eq."{pseudo}",user2.eq."{target}"),and(user1.eq."{target}",user2.eq."{pseudo}")').execute()
+        
+        if res.data:
+            return emit('error', "Demande déjà existante ou déjà amis")
+
+        supabase.table("friendships").insert({"user1": pseudo, "user2": target, "status": "accepted"}).execute()
+        emit('success', f"Demande envoyée à {target}")
+    except Exception as e:
+        print(f"Erreur friend_request: {e}")
+        emit('error', "Utilisateur introuvable ou erreur serveur")
+
 @socketio.on('get_friends')
 def get_friends():
     from flask import request
     try:
         user_data = connected_users.get(request.sid)
-        if not user_data: return
-        
         p = user_data['pseudo']
-        # Correction ici : ajout des " autour du pseudo
+        
+        # Correction : ajout des guillemets ici aussi
         res = supabase.table("friendships").select("*").or_(f'user1.eq."{p}",user2.eq."{p}"').execute()
         
         friends = []
         for f in res.data:
             friends.append(f['user2'] if f['user1'] == p else f['user1'])
-        
         emit('friends_list', {'friends': friends})
     except Exception as e:
         print(f"Erreur get_friends: {e}")
-@socketio.on('remove_friend')
-def remove_friend(data):
-    from flask import request
-    try:
-        user_data = connected_users.get(request.sid)
-        if not user_data:
-            return
-        
-        pseudo = user_data['pseudo']
-        target = data['target']
-        
-        supabase.table("friendships").delete().or_(
-            f"and(user1.eq.{pseudo},user2.eq.{target}),and(user1.eq.{target},user2.eq.{pseudo})"
-        ).execute()
-        
-        emit('notif', f'{target} retiré de tes amis')
-        
-    except Exception as e:
-        print(f"Erreur remove_friend: {e}")
-
 # === TCHAT ===
 @socketio.on('msg')
 def handle_msg(data):
@@ -505,6 +506,7 @@ def on_disconnect():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
 
 
 
