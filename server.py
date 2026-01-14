@@ -38,9 +38,11 @@ def get_user_data(pseudo):
     return res.data[0] if res.data else None
 
 # === ROUTES ===
+from flask import render_template # Assure-toi que render_template est importé en haut
+
 @app.route('/')
 def index():
-    return send_file('index.html')
+    return render_template('index.html')
 
 # === AUTHENTIFICATION ===
 @socketio.on('login_action')
@@ -514,6 +516,7 @@ def on_disconnect():
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host='0.0.0.0', port=port, debug=False)
+
 
 
 
