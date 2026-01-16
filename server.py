@@ -27,17 +27,34 @@ def get_rank(clicks):
         if clicks >= threshold: return title
     return "Vagabond"
 
-def send_leaderboard():
+def send_leaderboard(sid=None):
     try:
-        res = supabase.table("users").select("pseudo", "clicks").order("clicks", desc=True).limit(10).execute()
-        socketio.emit('leaderboard_update', {'players': res.data})
+        if sid:
+            u = connected_users.get(sid)
+            if u:
+                # Fetch relative leaderboard for a specific user
+                res = supabase.rpc('get_relative_leaderboard', {'player_pseudo': u['pseudo']}).execute()
+                socketio.emit('leaderboard_update', {'players': res.data}, room=sid)
+            else:
+                # Fallback for disconnected or unknown user
+                res = supabase.table("users").select("pseudo", "clicks").order("clicks", desc=True).limit(10).execute()
+                socketio.emit('leaderboard_update', {'players': res.data}, room=sid)
+        else:
+            # Broadcast top 10 to everyone
+            res = supabase.table("users").select("pseudo", "clicks").order("clicks", desc=True).limit(10).execute()
+            socketio.emit('leaderboard_update', {'players': res.data})
+
     except Exception as e:
         logging.error(f"Error in send_leaderboard: {e}")
 
 def leaderboard_background_task():
     while True:
-        send_leaderboard()
+        send_leaderboard() # Broadcast top 10
         socketio.sleep(15)
+
+@socketio.on('get_leaderboard')
+def get_leaderboard():
+    send_leaderboard(request.sid)
 
 # === ROUTES ===
 @app.route('/')
@@ -64,7 +81,7 @@ def auth_logic(data):
                 'pseudo': p, 'clicks': user['clicks'], 'mult': user['multiplier'],
                 'guild': user.get('guild_name'), 'rank': get_rank(user['clicks'])
             })
-            send_leaderboard()
+            send_leaderboard(request.sid)
             # On envoie les infos sociales au démarrage
             update_social_data(p)
         else:
@@ -84,7 +101,7 @@ def add_click():
             emit('update_score', {'clicks': nv, 'rank': get_rank(nv)})
 
             if nv % 10 == 0:
-                send_leaderboard()
+                send_leaderboard(request.sid)
 
             # Contribution guilde
             if u.get('guild'):
@@ -125,10 +142,19 @@ def update_social_data(pseudo):
         res_guild = supabase.table("guild_invites").select("*").eq("target_user", pseudo).execute()
         guild_invites = [g['guild_name'] for g in res_guild.data]
 
+        # 4. Demandes pour rejoindre MA guilde
+        my_guild_res = supabase.table("guilds").select("name").eq("founder", pseudo).execute()
+        guild_join_requests = []
+        if my_guild_res.data:
+            my_guild_name = my_guild_res.data[0]['name']
+            join_req_res = supabase.table("guild_join_requests").select("*").eq("guild_name", my_guild_name).execute()
+            guild_join_requests = join_req_res.data
+
         socketio.emit('social_update', {
             'friends': friends,
             'friend_requests': friend_requests,
-            'guild_invites': guild_invites
+            'guild_invites': guild_invites,
+            'guild_join_requests': guild_join_requests
         }, room=pseudo)
     except Exception as e:
         print(f"Social Update Error: {e}")
@@ -156,6 +182,7 @@ def send_friend_req(data):
         emit('success', f"Demande envoyée à {target}")
 
         # Notifie le destinataire
+        socketio.emit('notif', f"{u['pseudo']} vous a envoyé une demande d'ami !", room=target)
         update_social_data(target)
     except: emit('error', "Joueur introuvable")
 
@@ -169,9 +196,11 @@ def respond_friend(data):
         if action == 'accept':
             supabase.table("friendships").update({"status": "accepted"}).match({"user1": target, "user2": u['pseudo']}).execute()
             emit('success', f"Tu es maintenant ami avec {target}")
+            socketio.emit('notif', f"{u['pseudo']} a accepté votre demande d'ami.", room=target)
         else:
             supabase.table("friendships").delete().match({"user1": target, "user2": u['pseudo']}).execute()
             emit('success', "Demande refusée")
+            socketio.emit('notif', f"{u['pseudo']} a refusé votre demande d'ami.", room=target)
 
         update_social_data(u['pseudo'])
         update_social_data(target)
@@ -205,6 +234,78 @@ def create_g(data):
         logging.error(f"Error in create_guild for user {u.get('pseudo')} with name {n}: {e}")
         emit('error', "Nom pris ou erreur")
 
+@socketio.on('join_guild_request')
+def join_guild_req(data):
+    u = connected_users.get(request.sid)
+    guild_name = data['name']
+    if not u: return
+
+    try:
+        # Get guild founder to send notification
+        guild_res = supabase.table("guilds").select("founder").eq("name", guild_name).execute()
+        if not guild_res.data:
+            return emit('error', "Guilde introuvable.")
+
+        founder = guild_res.data[0]['founder']
+
+        # Create a join request
+        supabase.table("guild_join_requests").insert({
+            "guild_name": guild_name,
+            "requester": u['pseudo'],
+            "status": "pending"
+        }).execute()
+
+        emit('success', f"Demande envoyée pour rejoindre {guild_name}")
+
+        # Notify the guild founder
+        socketio.emit('notif', f"{u['pseudo']} veut rejoindre votre guilde !", room=founder)
+        update_social_data(founder)
+
+    except Exception as e:
+        logging.error(f"Error in join_guild_request for user {u.get('pseudo')} to guild {guild_name}: {e}")
+        emit('error', "Erreur lors de la demande pour rejoindre la guilde.")
+
+@socketio.on('respond_guild_join_request')
+def respond_join_req(data):
+    u = connected_users.get(request.sid)
+    requester = data['requester']
+    guild_name = data['guild_name']
+    action = data['action'] # 'accept' or 'decline'
+    if not u: return
+
+    try:
+        # Verify that the user is the founder of the guild
+        guild_res = supabase.table("guilds").select("founder").eq("name", guild_name).execute()
+        if not guild_res.data or guild_res.data[0]['founder'] != u['pseudo']:
+            return emit('error', "Vous n'êtes pas le fondateur de cette guilde.")
+
+        if action == 'accept':
+            supabase.table("users").update({"guild_name": guild_name}).eq("pseudo", requester).execute()
+            socketio.emit('notif', f"Votre demande pour rejoindre {guild_name} a été acceptée !", room=requester)
+
+            # Update the user's guild in connected_users if they are online
+            for sid, user_data in connected_users.items():
+                if user_data['pseudo'] == requester:
+                    user_data['guild'] = guild_name
+                    socketio.emit('update_full_state', {'guild': guild_name}, room=sid)
+                    break
+        else:
+            socketio.emit('notif', f"Votre demande pour rejoindre {guild_name} a été refusée.", room=requester)
+
+        # Delete the request
+        supabase.table("guild_join_requests").delete().match({
+            "guild_name": guild_name,
+            "requester": requester
+        }).execute()
+
+        emit('success', f"Demande de {requester} traitée.")
+        update_social_data(u['pseudo'])
+        update_social_data(requester)
+
+    except Exception as e:
+        logging.error(f"Error in respond_guild_join_request by {u.get('pseudo')} for {requester}: {e}")
+        emit('error', "Erreur lors de la réponse à la demande.")
+
 @socketio.on('invite_to_guild')
 def invite_guild(data):
     u = connected_users.get(request.sid)
@@ -231,6 +332,8 @@ def respond_guild(data):
             connected_users[request.sid]['guild'] = guild_name
             emit('update_full_state', {'guild': guild_name})
             emit('success', f"Bienvenue chez {guild_name} !")
+        else:
+            emit('success', f"Invitation de {guild_name} refusée.")
 
         # Dans tous les cas on supprime l'invitation
         supabase.table("guild_invites").delete().match({"guild_name": guild_name, "target_user": u['pseudo']}).execute()

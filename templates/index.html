@@ -213,6 +213,9 @@
 
             <div class="section-title">🛡️ INVITATIONS DE GUILDE</div>
             <div id="guild-invites"></div>
+
+            <div class="section-title">⚔️ DEMANDES POUR REJOINDRE VOTRE GUILDE</div>
+            <div id="guild-join-requests"></div>
         </div>
     </main>
 
@@ -280,6 +283,7 @@
             myData = d;
             updateUI(d);
             toast('Bienvenue, ' + d.pseudo + ' ! 🎮', 'success');
+            socket.emit('get_leaderboard');
         });
 
         socket.on('auth_error', msg => toast(msg, 'error'));
@@ -332,10 +336,17 @@
         // === LEADERBOARD ===
         socket.on('leaderboard_update', d => {
             const medals = ['gold', 'silver', 'bronze'];
-            document.getElementById('lb-content').innerHTML = d.players.map((p, i) => `
-                <div class="lb-item">
+            const isTopTen = d.players.length > 0 && d.players[0].rank === 1;
+
+            document.getElementById('lb-content').innerHTML = d.players.map((p, i) => {
+                const rank = isTopTen ? i + 1 : p.rank;
+                const medal = medals[rank - 1] || '';
+                const selfClass = p.pseudo === myData.pseudo ? 'style="background: rgba(0, 210, 255, 0.1);"' : '';
+
+                return `
+                <div class="lb-item" ${selfClass}>
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <div class="lb-rank ${medals[i] || ''}">${i + 1}</div>
+                        <div class="lb-rank ${medal}">${rank}</div>
                         <div>
                             <div style="font-weight: bold;">${p.pseudo}</div>
                             <div style="font-size: 0.7rem; color: gray;">${p.guild_name || 'Sans guilde'}</div>
@@ -343,7 +354,7 @@
                     </div>
                     <div style="color: var(--accent); font-weight: bold;">${p.clicks.toLocaleString()}</div>
                 </div>
-            `).join('') || '<div class="empty-state">Aucun joueur</div>';
+            `}).join('') || '<div class="empty-state">Aucun joueur</div>';
         });
 
         // === GUILDES ===
@@ -366,7 +377,7 @@
         }
 
         function joinGuild(guildName) {
-            socket.emit('join_guild', { name: guildName });
+            socket.emit('join_guild_request', { name: guildName });
         }
 
         function displayGuildData(data) {
@@ -425,6 +436,10 @@
             socket.emit('respond_guild_invite', { guild_name: guildName, action: action });
         }
 
+        function respondGuildJoinRequest(requester, guildName, action) {
+            socket.emit('respond_guild_join_request', { requester: requester, guild_name: guildName, action: action });
+        }
+
         socket.on('social_update', d => {
             // Mise à jour de la liste d'amis
             document.getElementById('friends-list').innerHTML = d.friends.map(f => `
@@ -466,8 +481,24 @@
                 </div>
             `).join('') || '<div class="empty-state">Aucune invitation</div>';
 
+            // Mise à jour des demandes pour rejoindre la guilde
+            document.getElementById('guild-join-requests').innerHTML = d.guild_join_requests.map(r => `
+                <div class="request-item">
+                     <div class="request-header">
+                        <div>
+                            <div style="font-weight: bold;">${r.requester}</div>
+                            <div style="font-size: 0.75rem; color: gray;">Veut rejoindre ${r.guild_name}</div>
+                        </div>
+                        <div class="request-actions">
+                            <button class="btn-accept" onclick="respondGuildJoinRequest('${r.requester}', '${r.guild_name}', 'accept')">✓</button>
+                            <button class="btn-decline" onclick="respondGuildJoinRequest('${r.requester}', '${r.guild_name}', 'decline')">✗</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('') || '<div class="empty-state">Aucune demande</div>';
+
             // Badge de notification
-            const notifCount = d.friend_requests.length + d.guild_invites.length;
+            const notifCount = d.friend_requests.length + d.guild_invites.length + (d.guild_join_requests ? d.guild_join_requests.length : 0);
             const badge = document.getElementById('notif-badge');
             if (notifCount > 0) {
                 badge.style.display = 'flex';
@@ -507,7 +538,9 @@
             playSfx(350, 0.05);
 
             // Charger les données de la vue
-            if (viewName === 'guildes') {
+            if (viewName === 'clicker') {
+                socket.emit('get_leaderboard');
+            } else if (viewName === 'guildes') {
                 socket.emit('get_guilds');
                 if (myData.guild) socket.emit('get_guild_data');
             } else if (viewName === 'social' || viewName === 'requests') {

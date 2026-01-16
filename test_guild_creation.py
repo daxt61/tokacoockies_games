@@ -32,10 +32,10 @@ def test_guild_creation_and_ui_update(server):
         page.goto("http://localhost:5000")
 
         # Authenticate
-        page.fill("#auth-user", "testuser")
+        unique_username = f"testuser_{int(time.time())}"
+        page.fill("#auth-user", unique_username)
         page.fill("#auth-pass", "testpass")
         page.click("text=S'INSCRIRE")
-        page.click("text=JOUER")
         page.wait_for_selector("#auth-overlay", state="hidden")
 
         # Go to the guild view
