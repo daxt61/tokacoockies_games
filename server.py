@@ -1,13 +1,17 @@
 import os
+import logging
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room
 from flask_bcrypt import Bcrypt
 from supabase import create_client, Client
+import eventlet
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'sorek_v9_ultra_secure'
 bcrypt = Bcrypt(app)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # === CONFIG SUPABASE ===
 SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
@@ -27,7 +31,13 @@ def send_leaderboard():
     try:
         res = supabase.table("users").select("pseudo", "clicks").order("clicks", desc=True).limit(10).execute()
         socketio.emit('leaderboard_update', {'players': res.data})
-    except: pass
+    except Exception as e:
+        logging.error(f"Error in send_leaderboard: {e}")
+
+def leaderboard_background_task():
+    while True:
+        send_leaderboard()
+        socketio.sleep(15)
 
 # === ROUTES ===
 @app.route('/')
@@ -73,10 +83,14 @@ def add_click():
             supabase.table("users").update({"clicks": nv}).eq("pseudo", u['pseudo']).execute()
             emit('update_score', {'clicks': nv, 'rank': get_rank(nv)})
 
+            if nv % 10 == 0:
+                send_leaderboard()
+
             # Contribution guilde
             if u.get('guild'):
                 supabase.rpc('increment_guild_clicks', {'guild_name': u['guild'], 'amount': u['mult']}).execute()
-        except: pass
+        except Exception as e:
+            logging.error(f"Error in add_click for user {u.get('pseudo')}: {e}")
 
 @socketio.on('buy_upgrade')
 def buy_up():
@@ -92,7 +106,8 @@ def buy_up():
                 emit('update_full_state', {'clicks': c-cost, 'mult': m+1, 'rank': get_rank(c-cost)})
                 emit('success', "Booster acheté ! 🚀")
             else: emit('error', "Pas assez de clics !")
-        except: pass
+        except Exception as e:
+            logging.error(f"Error in buy_upgrade for user {u.get('pseudo')}: {e}")
 
 # === SOCIAL : FONCTIONS DE BASE ===
 def update_social_data(pseudo):
@@ -160,7 +175,8 @@ def respond_friend(data):
 
         update_social_data(u['pseudo'])
         update_social_data(target)
-    except: pass
+    except Exception as e:
+        logging.error(f"Error in respond_friend_request for user {u.get('pseudo')} to target {target}: {e}")
 
 @socketio.on('remove_friend')
 def remove_friend(data):
@@ -171,7 +187,8 @@ def remove_friend(data):
         update_social_data(u['pseudo'])
         update_social_data(target)
         emit('success', f"{target} retiré.")
-    except: pass
+    except Exception as e:
+        logging.error(f"Error in remove_friend for user {u.get('pseudo')} to target {target}: {e}")
 
 # === SOCIAL : GUILDES ===
 @socketio.on('create_guild')
@@ -184,7 +201,9 @@ def create_g(data):
         connected_users[request.sid]['guild'] = n
         emit('update_full_state', {'guild': n})
         emit('success', f"Guilde {n} créée !")
-    except: emit('error', "Nom pris ou erreur")
+    except Exception as e:
+        logging.error(f"Error in create_guild for user {u.get('pseudo')} with name {n}: {e}")
+        emit('error', "Nom pris ou erreur")
 
 @socketio.on('invite_to_guild')
 def invite_guild(data):
@@ -196,7 +215,9 @@ def invite_guild(data):
         supabase.table("guild_invites").insert({"guild_name": u['guild'], "target_user": target}).execute()
         emit('success', f"Invitation envoyée à {target}")
         update_social_data(target)
-    except: emit('error', "Erreur invitation")
+    except Exception as e:
+        logging.error(f"Error in invite_to_guild for user {u.get('pseudo')} to target {target}: {e}")
+        emit('error', "Erreur invitation")
 
 @socketio.on('respond_guild_invite')
 def respond_guild(data):
@@ -214,7 +235,44 @@ def respond_guild(data):
         # Dans tous les cas on supprime l'invitation
         supabase.table("guild_invites").delete().match({"guild_name": guild_name, "target_user": u['pseudo']}).execute()
         update_social_data(u['pseudo'])
-    except: pass
+    except Exception as e:
+        logging.error(f"Error in respond_guild_invite for user {u.get('pseudo')} to guild {guild_name}: {e}")
+
+@socketio.on('get_guilds')
+def get_guilds():
+    try:
+        res = supabase.table("guilds").select("*").execute()
+        emit('guild_list', {'guilds': res.data})
+    except Exception as e:
+        logging.error(f"Error in get_guilds: {e}")
+
+@socketio.on('get_guild_data')
+def get_guild_data():
+    u = connected_users.get(request.sid)
+    if u and u.get('guild'):
+        try:
+            guild_name = u['guild']
+            guild_res = supabase.table("guilds").select("*").eq("name", guild_name).execute()
+            members_res = supabase.table("users").select("pseudo", "clicks").eq("guild_name", guild_name).execute()
+
+            if guild_res.data:
+                guild_data = guild_res.data[0]
+                guild_data['members'] = members_res.data
+                emit('guild_data', guild_data)
+        except Exception as e:
+            logging.error(f"Error in get_guild_data for user {u.get('pseudo')}: {e}")
+
+@socketio.on('leave_guild')
+def leave_guild():
+    u = connected_users.get(request.sid)
+    if u and u.get('guild'):
+        try:
+            supabase.table("users").update({"guild_name": None}).eq("pseudo", u['pseudo']).execute()
+            connected_users[request.sid]['guild'] = None
+            emit('update_full_state', {'guild': None})
+            emit('success', "Tu as quitté ta guilde.")
+        except Exception as e:
+            logging.error(f"Error in leave_guild for user {u.get('pseudo')}: {e}")
 
 # === TCHAT ===
 @socketio.on('msg')
@@ -224,4 +282,5 @@ def handle_msg(data):
         emit('new_msg', {'p': u['pseudo'], 'm': data['m'][:200]}, broadcast=True)
 
 if __name__ == '__main__':
+    socketio.start_background_task(leaderboard_background_task)
     socketio.run(app, host='0.0.0.0', port=5000)

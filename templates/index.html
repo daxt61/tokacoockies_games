@@ -330,7 +330,7 @@
         }
 
         // === LEADERBOARD ===
-        socket.on('lb_update', d => {
+        socket.on('leaderboard_update', d => {
             const medals = ['gold', 'silver', 'bronze'];
             document.getElementById('lb-content').innerHTML = d.players.map((p, i) => `
                 <div class="lb-item">
@@ -416,6 +416,10 @@
             socket.emit('respond_friend_request', { target: target, action: action });
         }
 
+        function inviteToGuild(target) {
+            socket.emit('invite_to_guild', { target: target });
+        }
+
         // === DEMANDES ===
         function respondGuildInvite(guildName, action) {
             socket.emit('respond_guild_invite', { guild_name: guildName, action: action });
@@ -426,7 +430,10 @@
             document.getElementById('friends-list').innerHTML = d.friends.map(f => `
                 <div class="friend-item">
                     <span style="font-weight: bold;">${f}</span>
-                    <button class="btn-decline" onclick="removeFriend('${f}')">Retirer</button>
+                    <div>
+                        <button class="btn" style="width: 80px; margin: 0; font-size: 0.75rem;" onclick="inviteToGuild('${f}')">Inviter</button>
+                        <button class="btn-decline" onclick="removeFriend('${f}')">Retirer</button>
+                    </div>
                 </div>
             `).join('') || '<div class="empty-state">Aucun ami<br><small>Ajoute des amis pour jouer ensemble !</small></div>';
 
