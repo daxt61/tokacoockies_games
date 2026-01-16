@@ -33,18 +33,12 @@ def send_leaderboard():
 
 def update_social_data(pseudo):
     try:
-        # Amis
         res_f = supabase.table("friendships").select("*").eq("status", "accepted").or_(f'user1.eq."{pseudo}",user2.eq."{pseudo}"').execute()
         friends = [f['user2'] if f['user1'] == pseudo else f['user1'] for f in res_f.data]
-        # Demandes reçues
         res_r = supabase.table("friendships").select("user1").eq("status", "pending").eq("user2", pseudo).execute()
         reqs = [r['user1'] for r in res_r.data]
-        # Invites Guilde
-        res_g = supabase.table("guild_invites").select("guild_name, guild_name").eq("target_user", pseudo).execute() # Astuce pour recup le nom
-        # Note: Supabase retourne parfois des objets complexes, on simplifie
         res_g = supabase.table("guild_invites").select("guild_name").eq("target_user", pseudo).execute()
         invites = [g['guild_name'] for g in res_g.data]
-
         socketio.emit('social_update', {'friends': friends, 'friend_requests': reqs, 'guild_invites': invites}, room=pseudo)
     except Exception as e: logging.error(f"Social Error: {e}")
 
@@ -114,9 +108,7 @@ def create_g(data):
 @socketio.on('get_guilds')
 def get_guilds():
     try:
-        # On recupère les guildes avec le nombre de membres (approximatif via RPC ou simple count)
         res = supabase.table("guilds").select("*").execute()
-        # Pour faire simple on renvoie la liste brute
         emit('guild_list', {'guilds': res.data})
     except: pass
 
