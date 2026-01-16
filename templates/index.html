@@ -3,284 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tokacookies Empire V10</title>
+    <title>Tokacookies Empire</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         :root { --accent: #00d2ff; --bg: #0d1117; --panel: #161b22; --border: #30363d; --gold: #ffd700; --red: #ff4d4d; --green: #2ecc71; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-
-        /* AUTH */
-        #auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        .auth-box { width: 300px; background: var(--panel); padding: 30px; border-radius: 20px; border: 1px solid var(--accent); text-align: center; }
-        input { width: 100%; padding: 12px; margin-bottom: 10px; background: #000; border: 1px solid var(--border); color: white; border-radius: 8px; }
-        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--accent); color: #000; margin-top: 5px; text-transform: uppercase; }
-        .btn.red { background: var(--red); color: white; }
-        .btn.green { background: var(--green); color: white; }
-        .btn-small { width: auto; padding: 5px 10px; font-size: 0.8rem; margin: 0 2px; }
-
-        /* HEADER & NAV */
-        header { padding: 15px; background: var(--panel); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        nav { height: 70px; background: var(--panel); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); }
-        .nav-item { color: #888; text-align: center; cursor: pointer; font-size: 0.8rem; position: relative; }
-        .nav-item.active { color: var(--accent); font-weight: bold; }
-        .badge { position: absolute; top: -5px; right: 5px; background: var(--red); color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.7rem; display: none; }
-
-        /* MAIN CONTENT */
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        #auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 100; display: flex; align-items: center; justify-content: center; text-align: center; }
+        .card { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px; }
+        input { width: 80%; padding: 10px; margin: 5px; border-radius: 5px; border: 1px solid var(--border); background: #000; color: white; }
+        .btn { padding: 12px 20px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; background: var(--accent); margin-top: 5px; }
+        .btn-red { background: var(--red); color: white; }
+        
         main { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .view { display: none; width: 100%; max-width: 500px; animation: fadeIn 0.3s ease; }
-        .view.active { display: block; }
-        .card { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 15px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* CLICKER AREA */
-        #score-big { font-size: 3.5rem; font-weight: 900; background: linear-gradient(to right, var(--accent), #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin: 10px 0; text-align: center; }
-        #cookie-btn { width: 180px; height: 180px; border-radius: 50%; margin: 0 auto; background: radial-gradient(circle, #1c2128, #000); border: 4px solid var(--accent); font-size: 4rem; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; box-shadow: 0 0 30px rgba(0,210,255,0.2); transition: 0.05s; }
-        #cookie-btn:active { transform: scale(0.95); }
-
-        /* LEADERBOARD (Sous le booster) */
-        .lb-item { display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #222; font-size: 0.9rem; }
-        .lb-item.me { background: rgba(0, 210, 255, 0.1); border-left: 3px solid var(--accent); }
-        .rank-num { width: 25px; font-weight: bold; color: var(--gold); }
-
-        /* LISTES SOCIALES */
-        .social-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px; }
+        .view { display: none; width: 100%; max-width: 400px; }
+        .active { display: block; }
+        
+        #cookie-btn { width: 150px; height: 150px; border-radius: 50%; background: #1c2128; border: 4px solid var(--accent); font-size: 50px; cursor: pointer; display: flex; align-items: center; justify-content: center; margin: 20px auto; user-select: none; transition: 0.1s; }
+        #cookie-btn:active { transform: scale(0.9); }
+        
+        .lb-item { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #222; font-size: 0.9rem; }
+        .me { background: rgba(0,210,255,0.1); border-left: 3px solid var(--accent); }
+        
+        nav { height: 60px; background: var(--panel); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); }
+        .nav-item { color: #888; cursor: pointer; font-size: 0.8rem; }
+        .nav-active { color: var(--accent); font-weight: bold; }
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 20px; display: none; z-index: 1000; }
     </style>
 </head>
 <body>
+    <div id="toast"></div>
+
     <div id="auth-overlay">
-        <div class="auth-box">
-            <h1 style="color:var(--accent);">EMPIRE V10</h1>
-            <input id="auth-u" placeholder="Pseudo">
-            <input id="auth-p" type="password" placeholder="Mot de passe">
-            <button class="btn" onclick="auth('login')">Se connecter</button>
-            <button class="btn" style="background:transparent; color:white; border:1px solid #444;" onclick="auth('register')">S'inscrire</button>
+        <div class="card">
+            <h1 style="color:var(--accent)">TOKACOOKIES</h1>
+            <input id="u" placeholder="Pseudo">
+            <input id="p" type="password" placeholder="Mot de passe">
+            <button class="btn" onclick="auth('login')">CONNEXION</button>
+            <button class="btn" style="background:none; color:white" onclick="auth('register')">S'inscrire</button>
         </div>
     </div>
 
-    <header>
-        <div><b id="ui-pseudo">...</b> <span id="ui-rank" style="color:#888; font-size:0.8rem;">...</span></div>
-        <div id="ui-guild" style="background:#222; padding:4px 8px; border-radius:4px; font-size:0.8rem;">[SOLO]</div>
+    <header style="padding: 10px; display: flex; justify-content: space-between; border-bottom: 1px solid var(--border)">
+        <span id="ui-pseudo">...</span>
+        <span id="ui-guild-tag" style="color:var(--gold)">[SOLO]</span>
     </header>
 
     <main>
-        <div id="view-game" class="view active">
-            <div id="score-big">0</div>
-            <div id="cookie-btn" onmousedown="doClick()">👆</div>
-            
-            <div style="display:flex; justify-content:space-between; margin: 20px 0;">
-                <div class="card" style="flex:1; margin-right:5px; text-align:center;">Mult: <span id="ui-mult" style="color:var(--accent); font-weight:bold;">1</span></div>
-                <div class="card" style="flex:1; margin-left:5px; text-align:center;">Coût: <span id="ui-cost" style="color:var(--red); font-weight:bold;">100</span></div>
+        <div id="v-game" class="view active">
+            <h1 id="ui-clicks" style="font-size: 3rem; margin: 10px 0;">0</h1>
+            <div id="cookie-btn" onmousedown="clickit()">🍪</div>
+            <div class="card" style="text-align:center">
+                Multiplier: x<span id="ui-mult">1</span> | Prochain: <span id="ui-cost">100</span> clics
             </div>
+            <button class="btn" style="width:100%" onclick="socket.emit('buy_upgrade')">🚀 ACHETER BOOSTER</button>
             
-            <button class="btn" onclick="socket.emit('buy_upgrade')">🚀 ACHETER BOOSTER</button>
-
-            <div class="card" style="margin-top:20px;">
-                <h3 style="margin-bottom:10px; color:var(--accent);">🏆 Classement Live</h3>
-                <div id="live-leaderboard">Chargement...</div>
+            <div class="card" style="margin-top:20px">
+                <h3 style="color:var(--accent); margin:0 0 10px 0">🏆 Classement Live</h3>
+                <div id="live-lb">Chargement du rang...</div>
             </div>
         </div>
 
-        <div id="view-guild" class="view">
-            <h2>🛡️ Gestion de Guilde</h2>
-            
-            <div id="no-guild-ui">
+        <div id="v-guild" class="view">
+            <h2>🛡️ Guildes</h2>
+            <div id="guild-solo">
                 <div class="card">
                     <h3>Créer une Guilde</h3>
-                    <input id="g-create-name" placeholder="Nom de la guilde">
-                    <button class="btn" onclick="socket.emit('create_guild', {name: document.getElementById('g-create-name').value})">Fonder</button>
+                    <input id="gn" placeholder="Nom de la guilde">
+                    <button class="btn" onclick="socket.emit('create_guild', {name: document.getElementById('gn').value})">Fonder</button>
                 </div>
                 <div class="card">
-                    <h3>Rejoindre une Guilde</h3>
-                    <div id="guild-list-all"></div>
+                    <h3>Rejoindre</h3>
+                    <div id="all-guilds"></div>
                 </div>
             </div>
-
-            <div id="has-guild-ui" style="display:none;">
-                <div class="card" style="border-color:var(--red);">
-                    <h3 style="color:var(--red);">⚠️ Zone de Danger</h3>
-                    <p>Tu ne peux pas rejoindre d'autres guildes tant que tu es ici.</p>
-                    <button class="btn red" onclick="if(confirm('Sûr de vouloir trahir ?')) socket.emit('leave_guild')">TRAHIR LA GUILDE</button>
+            <div id="guild-member" style="display:none">
+                <div class="card">
+                    <button class="btn btn-red" onclick="socket.emit('leave_guild')">TRAHIR LA GUILDE</button>
                 </div>
-                
-                <div id="leader-ui" class="card" style="display:none; border-color:var(--gold);">
-                    <h3 style="color:var(--gold);">👑 Demandes d'adhésion</h3>
-                    <div id="guild-requests-list">Aucune demande en attente.</div>
+                <div id="leader-panel" class="card" style="display:none">
+                    <h3 style="color:var(--gold)">Recrutement</h3>
+                    <div id="guild-reqs"></div>
                 </div>
             </div>
         </div>
 
-        <div id="view-social" class="view">
+        <div id="v-social" class="view">
             <h2>👥 Social</h2>
-            
             <div class="card">
-                <h3>Ajouter un ami</h3>
-                <div style="display:flex; gap:5px;">
-                    <input id="friend-input" placeholder="Pseudo...">
-                    <button class="btn" style="width:auto;" onclick="socket.emit('send_friend_request', {target: document.getElementById('friend-input').value})">+</button>
-                </div>
+                <input id="fa" placeholder="Ajouter un ami...">
+                <button class="btn" onclick="socket.emit('send_friend_request', {target: document.getElementById('fa').value})">+</button>
             </div>
-
             <div class="card">
-                <h3>Demandes reçues</h3>
-                <div id="friend-req-list">Rien pour l'instant.</div>
+                <h3>Demandes</h3>
+                <div id="f-reqs"></div>
             </div>
-
             <div class="card">
-                <h3>Mes Amis</h3>
-                <div id="friend-list"></div>
+                <h3>Amis</h3>
+                <div id="f-list"></div>
             </div>
         </div>
     </main>
 
     <nav>
-        <div class="nav-item active" onclick="nav('game', this)">Jeu</div>
-        <div class="nav-item" onclick="nav('guild', this); socket.emit('get_guilds')">Guildes</div>
-        <div class="nav-item" onclick="nav('social', this)">Social <span id="social-badge" class="badge">0</span></div>
+        <div class="nav-item nav-active" onclick="tab('game', this)">JEU</div>
+        <div class="nav-item" onclick="tab('guild', this); socket.emit('get_guilds')">GUILDES</div>
+        <div class="nav-item" onclick="tab('social', this)">SOCIAL</div>
     </nav>
 
     <script>
         const socket = io();
         
-        // --- AUDIO SYSTEM ---
-        const clickSounds = [
-            new Audio('pop-423717.mp3'),
-            new Audio('pop-402324.mp3'),
-            new Audio('sharp-pop-328170.mp3'),
-            new Audio('pop-402323.mp3')
+        // --- SONS ---
+        const clicksSfx = [
+            new Audio('/static/pop-423717.mp3'),
+            new Audio('/static/pop-402324.mp3'),
+            new Audio('/static/sharp-pop-328170.mp3'),
+            new Audio('/static/pop-402323.mp3')
         ];
-        const notifSound = new Audio('son pour les notification.mp3');
+        const notifSfx = new Audio('/static/notification.mp3');
 
-        function playClickSound() {
-            const sound = clickSounds[Math.floor(Math.random() * clickSounds.length)];
-            sound.currentTime = 0;
-            sound.play().catch(e => {}); // Ignorer erreur autoplay
+        function clickit() {
+            clicksSfx[Math.floor(Math.random()*4)].play();
+            socket.emit('add_click');
         }
 
         // --- AUTH ---
         function auth(t) {
-            socket.emit('login_action', {pseudo: document.getElementById('auth-u').value, password: document.getElementById('auth-p').value, type: t});
+            socket.emit('login_action', {pseudo: document.getElementById('u').value, password: document.getElementById('p').value, type: t});
         }
-
         socket.on('login_ok', d => {
-            document.getElementById('auth-overlay').style.display = 'none';
+            document.getElementById('auth-overlay').style.display='none';
             updateUI(d);
         });
 
-        // --- UI UPDATES ---
+        // --- UPDATES ---
         socket.on('update_score', d => updateUI(d));
         socket.on('update_full_state', d => updateUI(d));
-
+        
         function updateUI(d) {
             if(d.pseudo) document.getElementById('ui-pseudo').innerText = d.pseudo;
-            if(d.clicks !== undefined) document.getElementById('score-big').innerText = Math.floor(d.clicks).toLocaleString();
-            if(d.mult) { document.getElementById('ui-mult').innerText = d.mult; document.getElementById('ui-cost').innerText = d.mult * 100; }
-            if(d.rank) document.getElementById('ui-rank').innerText = d.rank;
-            
+            if(d.clicks !== undefined) document.getElementById('ui-clicks').innerText = Math.floor(d.clicks).toLocaleString();
+            if(d.mult) {
+                document.getElementById('ui-mult').innerText = d.mult;
+                document.getElementById('ui-cost').innerText = d.mult * 100;
+            }
             if(d.guild !== undefined) {
-                if(d.guild) {
-                    document.getElementById('ui-guild').innerText = "[" + d.guild + "]";
-                    document.getElementById('no-guild-ui').style.display = 'none';
-                    document.getElementById('has-guild-ui').style.display = 'block';
-                } else {
-                    document.getElementById('ui-guild').innerText = "[SOLO]";
-                    document.getElementById('no-guild-ui').style.display = 'block';
-                    document.getElementById('has-guild-ui').style.display = 'none';
-                    document.getElementById('leader-ui').style.display = 'none';
-                }
+                const tag = document.getElementById('ui-guild-tag');
+                tag.innerText = d.guild ? `[${d.guild}]` : "[SOLO]";
+                document.getElementById('guild-solo').style.display = d.guild ? 'none' : 'block';
+                document.getElementById('guild-member').style.display = d.guild ? 'block' : 'none';
             }
         }
 
-        // --- GAMEPLAY ---
-        function doClick() {
-            playClickSound();
-            socket.emit('add_click');
-            // Animation visuelle
-            const btn = document.getElementById('cookie-btn');
-            btn.style.transform = "scale(0.9)";
-            setTimeout(() => btn.style.transform = "scale(1)", 50);
-        }
-
-        // --- LEADERBOARD (TEMPS RÉEL) ---
         socket.on('leaderboard_update', d => {
-            const myName = document.getElementById('ui-pseudo').innerText;
-            document.getElementById('live-leaderboard').innerHTML = d.players.map(p => `
-                <div class="lb-item ${p.pseudo === myName ? 'me' : ''}">
-                    <span><span class="rank-num">#${p.rank}</span> ${p.pseudo}</span>
+            const me = document.getElementById('ui-pseudo').innerText;
+            document.getElementById('live-lb').innerHTML = d.players.map(p => `
+                <div class="lb-item ${p.pseudo === me ? 'me' : ''}">
+                    <span>#${p.rank} ${p.pseudo}</span>
                     <b>${Math.floor(p.clicks).toLocaleString()}</b>
                 </div>
             `).join('');
         });
 
-        // --- SOCIAL & GUILDE ---
         socket.on('social_update', d => {
-            // Amis
-            document.getElementById('friend-list').innerHTML = d.friends.map(f => `<div class="social-row"><span>🟢 ${f}</span></div>`).join('');
+            document.getElementById('f-list').innerHTML = d.friends.map(f => `<div class="lb-item">🟢 ${f}</div>`).join('') || "Aucun ami";
+            document.getElementById('f-reqs').innerHTML = d.friend_requests.map(r => `
+                <div class="lb-item">${r} 
+                    <button onclick="socket.emit('respond_friend_request',{target:'${r}',action:'accept'})">✔</button>
+                </div>`).join('') || "Rien";
             
-            // Demandes Amis (Accepter / Refuser)
-            document.getElementById('friend-req-list').innerHTML = d.friend_requests.map(r => `
-                <div class="social-row">
-                    <span>${r}</span>
-                    <div>
-                        <button class="btn btn-small green" onclick="socket.emit('respond_friend_request', {target:'${r}', action:'accept'})">✔</button>
-                        <button class="btn btn-small red" onclick="socket.emit('respond_friend_request', {target:'${r}', action:'decline'})">✖</button>
-                    </div>
-                </div>
-            `).join('') || "Rien.";
-
-            // Demandes Guilde (Pour le chef)
-            if (d.is_leader) {
-                document.getElementById('leader-ui').style.display = 'block';
-                document.getElementById('guild-requests-list').innerHTML = d.guild_join_requests.map(req => `
-                    <div class="social-row">
-                        <span>${req}</span>
-                        <div>
-                            <button class="btn btn-small green" onclick="socket.emit('respond_guild_join', {requester:'${req}', action:'accept'})">Accepter</button>
-                            <button class="btn btn-small red" onclick="socket.emit('respond_guild_join', {requester:'${req}', action:'decline'})">Refuser</button>
-                        </div>
-                    </div>
-                `).join('') || "Aucune demande.";
+            if(d.is_leader) {
+                document.getElementById('leader-panel').style.display = 'block';
+                document.getElementById('guild-reqs').innerHTML = d.guild_join_requests.map(r => `
+                    <div class="lb-item">${r} 
+                        <button onclick="socket.emit('respond_guild_join',{requester:'${r}',action:'accept'})">Accepter</button>
+                    </div>`).join('') || "Aucune demande";
             }
-
-            // Badge
-            const total = d.friend_requests.length + d.guild_invites.length + (d.guild_join_requests ? d.guild_join_requests.length : 0);
-            const badge = document.getElementById('social-badge');
-            badge.innerText = total;
-            badge.style.display = total > 0 ? 'block' : 'none';
         });
 
         socket.on('guild_list', d => {
-            document.getElementById('guild-list-all').innerHTML = d.guilds.map(g => `
-                <div class="social-row">
-                    <span><b>${g.name}</b> (${g.total_clicks} clics)</span>
-                    <button class="btn btn-small" onclick="socket.emit('ask_join_guild', {name:'${g.name}'})">Rejoindre</button>
-                </div>
-            `).join('');
+            document.getElementById('all-guilds').innerHTML = d.guilds.map(g => `
+                <div class="lb-item">${g.name} (${g.total_clicks}) 
+                    <button onclick="socket.emit('ask_join_guild',{name:'${g.name}'})">Rejoindre</button>
+                </div>`).join('');
         });
 
-        // --- NOTIFICATIONS ---
-        socket.on('notif_sound', () => {
-            notifSound.currentTime = 0;
-            notifSound.play().catch(e => {});
-        });
+        socket.on('notif_sound', () => notifSfx.play());
+        socket.on('success', m => toast(m, 'var(--green)'));
+        socket.on('error', m => toast(m, 'var(--red)'));
 
-        socket.on('success', m => showToast(m, 'var(--green)'));
-        socket.on('error', m => showToast(m, 'var(--red)'));
-
-        function showToast(msg, color) {
+        function toast(m, c) {
             const t = document.getElementById('toast');
-            t.innerText = msg;
-            t.style.background = color || 'var(--accent)';
-            t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
+            t.innerText = m; t.style.background = c; t.style.display = 'block';
+            setTimeout(() => t.style.display='none', 3000);
         }
 
-        // Navigation
-        function nav(id, el) {
+        function tab(id, el) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById('view-' + id).classList.add('active');
-            el.classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active'));
+            document.getElementById('v-'+id).classList.add('active');
+            el.classList.add('nav-active');
         }
     </script>
 </body>
