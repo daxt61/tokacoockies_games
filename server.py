@@ -442,47 +442,47 @@ def auth_logic(data):
 @socketio.on('add_click')
 @rate_limit('click', max_calls=50, period=1)
 @authenticated
-def add_click():
-    u = connected_users.get(request.sid)
+@socketio.on('add_click')
+@authenticated
+def add_click(sid):
+    user = connected_users[sid]
+    now = time.time()
     
+    # Vérification anti-cheat (Rate limit)
+    if now - user['last_click'] < 0.05:  # Max 20 clics/sec
+        return
+        
+    user['last_click'] = now
+    
+    # Calcul du gain
+    gain = user['mult'] * (1 + (user['prestige'] * 0.1)) # Bonus prestige
+    user['clicks'] += gain
+    
+    # Mise à jour rapide en mémoire (On envoie juste le score au joueur)
+    emit('update_score', {
+        'clicks': user['clicks'], 
+        'rank': user.get('rank_info') # On garde l'ancien rang pour l'instant
+    })
+    
+    # LOGIQUE "TOUS LES 5 CLICS"
+    # On sauvegarde en BDD et on met à jour le leaderboard seulement tous les 5 clics
+    if int(user['clicks']) % 5 == 0:
+        # 1. Sauvegarde BDD (Async pour ne pas bloquer)
+        socketio.start_background_task(save_user_background, user)
+        
+        # 2. Envoi du leaderboard mis à jour
+        # Le joueur verra ses voisins changer s'il les a doublés
+        send_leaderboard(sid)
+        
+        # Note : On n'envoie pas à TOUT LE MONDE à chaque fois pour ne pas crash le serveur.
+        # Les autres verront ton score monter via la tâche de fond (toutes les 5s).
+
+def save_user_background(user_data):
+    """Petite fonction pour sauvegarder sans bloquer le jeu"""
     try:
-        res = supabase.table("users").select("clicks, multiplier").eq("pseudo", u['pseudo']).execute()
-        if not res.data:
-            return
-            
-        current_clicks = res.data[0]['clicks']
-        mult = res.data[0]['multiplier']
-        
-        # Apply powerup
-        powerup_mult = u.get('powerup_mult', 1)
-        total_gain = mult * powerup_mult
-        
-        new_total = current_clicks + total_gain
-        supabase.table("users").update({"clicks": new_total}).eq("pseudo", u['pseudo']).execute()
-        
-        rank_info = get_rank(new_total)
-        emit('update_score', {'clicks': new_total, 'rank': rank_info, 'gain': total_gain})
-        
-        # Check achievements
-        achievements = check_achievements(u['pseudo'], new_total, mult=mult)
-        if achievements:
-            emit('achievement_unlocked', {'achievements': achievements})
-        
-        if new_total % 100 == 0:
-            send_leaderboard(request.sid)
-        
-        # Guild contribution
-        if u.get('guild'):
-            try:
-                supabase.rpc('increment_guild_clicks', {
-                    'p_guild_name': u['guild'],
-                    'p_amount': total_gain
-                }).execute()
-            except:
-                pass
-                
+        supabase.table("users").update({"clicks": user_data['clicks']}).eq("pseudo", user_data['pseudo']).execute()
     except Exception as e:
-        logger.error(f"Click error: {e}")
+        logger.error(f"Save error: {e}")
 
 @socketio.on('buy_upgrade')
 @rate_limit('upgrade', max_calls=10, period=10)
