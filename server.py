@@ -337,36 +337,44 @@ def auth_logic(data):
         action_type = data['type']
         
         if not pseudo or not password or len(password) < 6:
-            return emit('error', "Invalid credentials format")
+            return emit('error', "Format des identifiants invalide (min 6 caractères)")
+        
+        # 1. On récupère l'heure actuelle en UTC (Aware)
+        now = datetime.now(timezone.utc)
         
         res = supabase.table("users").select("*").eq("pseudo", pseudo).execute()
         user = res.data[0] if res.data else None
 
         if action_type == 'register':
             if user:
-                return emit('error', "Username already taken")
+                return emit('error', "Nom d'utilisateur déjà pris")
             
             hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
-            supabase.table("users").insert({
+            # Insertion avec last_online en UTC
+            insert_res = supabase.table("users").insert({
                 "pseudo": pseudo,
                 "password": hashed_pw,
                 "clicks": 0,
                 "multiplier": 1,
                 "auto_clicker": 0,
                 "prestige_level": 0,
-                "prestige_points": 0
+                "prestige_points": 0,
+                "last_online": now.isoformat()
             }).execute()
             
-            user = supabase.table("users").select("*").eq("pseudo", pseudo).execute().data[0]
-            emit('success', "Account created successfully!")
+            user = insert_res.data[0]
+            emit('success', "Compte créé avec succès !")
 
+        # Vérification du mot de passe
         if user and bcrypt.check_password_hash(user['password'], password):
-            # Update last online
-            supabase.table("users").update({"last_online": datetime.now().isoformat()}).eq("pseudo", pseudo).execute()
+            # 2. Mise à jour last_online (UTC aware)
+            supabase.table("users").update({
+                "last_online": now.isoformat()
+            }).eq("pseudo", pseudo).execute()
             
             connected_users[request.sid] = {
                 'pseudo': pseudo,
-                'mult': user['multiplier'],
+                'mult': user.get('multiplier', 1),
                 'guild': user.get('guild_name'),
                 'auto': user.get('auto_clicker', 0),
                 'powerup_mult': 1,
@@ -374,22 +382,26 @@ def auth_logic(data):
             }
             join_room(pseudo)
             
-            rank_info = get_rank(user['clicks'])
+            rank_info = get_rank(user.get('clicks', 0))
             
-            # Check daily reward availability
+            # 3. GESTION DU DAILY (Correction Naive vs Aware)
             daily_available = False
-            if user.get('last_daily_claim'):
-                last_claim = datetime.fromisoformat(user['last_daily_claim'].replace('Z', '+00:00'))
-                if datetime.now() - last_claim > timedelta(hours=20):
+            last_daily_claim = user.get('last_daily_claim')
+            
+            if last_daily_claim:
+                # On convertit la date DB en aware (UTC)
+                last_claim_dt = datetime.fromisoformat(last_daily_claim.replace('Z', '+00:00'))
+                # La soustraction fonctionne maintenant car NOW est aussi aware
+                if now - last_claim_dt > timedelta(hours=20):
                     daily_available = True
             else:
                 daily_available = True
             
-            # Send login success
+            # Envoi des données au client
             emit('login_ok', {
                 'pseudo': pseudo,
-                'clicks': user['clicks'],
-                'mult': user['multiplier'],
+                'clicks': user.get('clicks', 0),
+                'mult': user.get('multiplier', 1),
                 'auto': user.get('auto_clicker', 0),
                 'guild': user.get('guild_name'),
                 'rank': rank_info,
@@ -401,15 +413,19 @@ def auth_logic(data):
                 'settings': user.get('settings', {})
             })
             
+            # Fonctions utilitaires
             send_leaderboard(request.sid)
             update_social_data(pseudo)
-            get_achievements_data()
+            # Attention : vérifie que get_achievements_data() ne prend pas d'argument 
+            # ou envoie request.sid si nécessaire
+            get_achievements_data() 
             
         else:
-            emit('error', "Invalid credentials")
+            emit('error', "Identifiants invalides")
+            
     except Exception as e:
         logger.error(f"Auth error: {e}")
-        emit('error', "Authentication failed")
+        emit('error', "Erreur d'authentification")
 
 # ============================================================================
 # GAME ACTIONS
