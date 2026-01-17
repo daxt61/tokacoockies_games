@@ -2,7 +2,8 @@ flask==3.0.0
 flask-socketio==5.3.5
 flask-bcrypt==1.0.1
 supabase==2.3.0
-eventlet==0.33.3
+eventlet==0.35.2
+setuptools
 gunicorn==21.2.0
 python-socketio==5.10.0
 python-engineio==4.8.0
