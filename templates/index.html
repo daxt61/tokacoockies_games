@@ -3,39 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tokacookies Empire</title>
+    <title>Tokacookies Empire - Social Update</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
         :root { --accent: #00d2ff; --bg: #0d1117; --panel: #161b22; --border: #30363d; --gold: #ffd700; --red: #ff4d4d; --green: #2ecc71; }
         body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .card { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px; }
+        .card { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px; width: 100%; box-sizing: border-box; }
         input { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid var(--border); background: #000; color: white; box-sizing: border-box; }
         .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; background: var(--accent); color: #000; transition: 0.2s; }
         .btn:active { transform: scale(0.98); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
         #auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
         main { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; align-items: center; }
         .view { display: none; width: 100%; max-width: 500px; animation: fadeIn 0.3s; }
         .view.active { display: block; }
         
-        #cookie-btn { width: 160px; height: 160px; border-radius: 50%; background: radial-gradient(circle, #1c2128, #000); border: 4px solid var(--accent); font-size: 60px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; margin: 20px auto; transition: 0.1s; box-shadow: 0 0 20px rgba(0,210,255,0.2); }
+        #cookie-btn { width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle, #1c2128, #000); border: 4px solid var(--accent); font-size: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; margin: 20px auto; transition: 0.1s; box-shadow: 0 0 20px rgba(0,210,255,0.2); }
         #cookie-btn:active { transform: scale(0.92); }
         
-        #chat-box { height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #000; border-radius: 8px; border: 1px solid var(--border); }
+        #chat-box { height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #000; border-radius: 8px; border: 1px solid var(--border); }
         .msg { font-size: 0.9rem; padding: 5px 10px; border-radius: 5px; background: #1c2128; }
         .msg b { color: var(--accent); }
-        .msg .g-tag { color: var(--gold); font-size: 0.7rem; margin-right: 5px; }
 
-        .lb-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; align-items: center; }
-        .me { background: rgba(0,210,255,0.1); border-radius: 8px; }
+        .item-list { list-style: none; padding: 0; margin: 0; }
+        .item-list li { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; align-items: center; }
 
         nav { height: 70px; background: var(--panel); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); }
-        .nav-item { color: #888; font-size: 0.75rem; text-align: center; cursor: pointer; position: relative; }
+        .nav-item { color: #888; font-size: 0.7rem; text-align: center; cursor: pointer; flex: 1; }
         .nav-item.active { color: var(--accent); font-weight: bold; }
-        .dot { position: absolute; top: -5px; right: -5px; width: 8px; height: 8px; background: var(--red); border-radius: 50%; display: none; }
 
-        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 25px; border-radius: 30px; display: none; z-index: 3000; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 25px; border-radius: 30px; display: none; z-index: 3000; font-weight: bold; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
@@ -44,51 +41,68 @@
 
     <div id="auth-overlay">
         <div class="card" style="width: 300px; text-align: center;">
-            <h1 style="color:var(--accent); margin-bottom: 20px;">🍪 TOKA Empire</h1>
-            <input id="pseudo" placeholder="Pseudo (3 caractères min)">
+            <h1 style="color:var(--accent);">🍪 TOKA Empire</h1>
+            <input id="pseudo" placeholder="Pseudo">
             <input id="pass" type="password" placeholder="Mot de passe">
-            <button class="btn" onclick="auth('login')">SE CONNECTER</button>
-            <button class="btn" style="background:none; color:white; margin-top:10px;" onclick="auth('register')">Créer un compte</button>
-            <p id="status" style="margin-top:10px; font-size:0.8rem; color:#888;">Connexion au serveur...</p>
+            <button class="btn" onclick="auth('login')">CONNEXION</button>
+            <button class="btn" style="background:none; color:white; margin-top:5px;" onclick="auth('register')">S'inscrire</button>
+            <p id="status" style="margin-top:10px; font-size:0.8rem; color:#888;">Initialisation...</p>
         </div>
     </div>
 
-    <header style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel);">
-        <div><b id="my-name">...</b> <small id="my-rank" style="color: #888;"></small></div>
-        <div id="my-guild" style="color:var(--gold); font-weight: bold;">[SOLO]</div>
+    <header style="padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel);">
+        <div><b id="my-name">...</b> <small id="my-rank"></small></div>
+        <div id="my-guild-tag" style="color:var(--gold);">[SOLO]</div>
     </header>
 
     <main>
         <div id="view-game" class="view active">
-            <h1 id="score-text" style="font-size: 3rem; text-align: center; margin: 10px 0;">0</h1>
-            <div id="cookie-btn" onclick="doClick()">🍪</div>
+            <h1 id="score-text" style="font-size: 2.5rem; text-align: center; margin: 10px 0;">0</h1>
+            <div id="cookie-btn" onclick="socket.emit('add_click')">🍪</div>
             
             <div class="card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div style="text-align:center">
-                    <b title="Multiplie vos clics manuels">Clic: x<span id="mult-text">1</span></b><br>
-                    <small>Prix: <span id="cost-text" style="color:var(--red)">200</span></small>
-                    <button class="btn" style="margin-top:5px" onclick="buyUpgrade('mult')">BOOST</button>
+                    <b>Clic: x<span id="mult-text">1</span></b><br>
+                    <button class="btn" style="margin-top:5px" onclick="socket.emit('buy_upgrade', {type:'mult'})">BOOST</button>
                 </div>
                 <div style="text-align:center; border-left: 1px solid #333">
-                    <b title="Production automatique par seconde">Auto: <span id="auto-text">0</span>/s</b><br>
-                    <small>Prix: <span id="auto-cost-text" style="color:var(--red)">750</span></small>
-                    <button class="btn" style="margin-top:5px; background:var(--green)" onclick="buyUpgrade('auto')">CPS+</button>
+                    <b>Auto: <span id="auto-text">0</span>/s</b><br>
+                    <button class="btn" style="margin-top:5px; background:var(--green)" onclick="socket.emit('buy_upgrade', {type:'auto'})">CPS+</button>
                 </div>
             </div>
 
             <div class="card">
-                <h3 style="color:var(--accent); margin:0 0 10px 0;">🏆 Classement</h3>
-                <div id="leaderboard-list">Chargement...</div>
+                <h3 style="margin:0 0 10px 0;">🏆 Top 10</h3>
+                <div id="leaderboard-list"></div>
+            </div>
+        </div>
+
+        <div id="view-social" class="view">
+            <h3>🛡️ Ma Guilde</h3>
+            <div class="card" id="guild-section">
+                <input id="guild-input" placeholder="Nom de la guilde...">
+                <button class="btn" onclick="createGuild()">CRÉER GUILDE</button>
+            </div>
+
+            <h3>👥 Amis</h3>
+            <div class="card">
+                <div style="display:flex; gap:5px;">
+                    <input id="friend-input" placeholder="Pseudo de l'ami...">
+                    <button class="btn" style="width:80px" onclick="addFriend()">ADD</button>
+                </div>
+                <ul id="friends-list" class="item-list" style="margin-top:10px;">
+                    <li style="color:#666; justify-content:center;">Aucun ami ajouté</li>
+                </ul>
             </div>
         </div>
 
         <div id="view-chat" class="view">
-            <h2>💬 Chat Global</h2>
+            <h3>💬 Chat Global</h3>
             <div class="card">
                 <div id="chat-box"></div>
                 <div style="display:flex; gap:5px; margin-top:10px;">
-                    <input id="chat-input" placeholder="Message..." onkeypress="if(event.key==='Enter') sendChat()">
-                    <button class="btn" style="width:80px" onclick="sendChat()">SEND</button>
+                    <input id="chat-input" placeholder="Message...">
+                    <button class="btn" style="width:80px" onclick="sendChat()">OK</button>
                 </div>
             </div>
         </div>
@@ -96,150 +110,79 @@
 
     <nav>
         <div class="nav-item active" onclick="tab('game', this)">🕹️<br>JEU</div>
+        <div class="nav-item" onclick="tab('social', this)">👥<br>SOCIAL</div>
         <div class="nav-item" onclick="tab('chat', this)">💬<br>CHAT</div>
     </nav>
 
     <script>
-        console.log("🚀 Initialisation du client...");
         const socket = io();
         let myName = "";
-        let isConnected = false;
 
-        // --- GESTION CONNEXION SOCKET ---
-        socket.on('connect', () => {
-            console.log("✅ Socket connecté !");
-            isConnected = true;
-            document.getElementById('status').innerText = "✅ Serveur connecté";
-            document.getElementById('status').style.color = "var(--green)";
-        });
-
-        socket.on('disconnect', () => {
-            console.log("❌ Socket déconnecté");
-            isConnected = false;
-            document.getElementById('status').innerText = "❌ Déconnecté du serveur";
-            document.getElementById('status').style.color = "var(--red)";
-        });
-
-        socket.on('connect_error', (err) => {
-            console.error("❌ Erreur de connexion:", err);
-            document.getElementById('status').innerText = "❌ Erreur de connexion";
-            document.getElementById('status').style.color = "var(--red)";
-        });
-
-        // --- FONCTIONS PRINCIPALES ---
-        
-        function doClick() { 
-            if (!isConnected) return toast("Pas connecté au serveur", "var(--red)");
-            console.log("🖱️ Clic envoyé");
-            socket.emit('add_click'); 
-        }
-        
+        // --- AUTH ---
         function auth(type) {
-            const p = document.getElementById('pseudo').value.trim();
-            const pw = document.getElementById('pass').value;
-            
-            console.log(`🔐 Tentative de ${type} pour "${p}"`);
-            
-            if(!p || p.length < 3) {
-                toast("Pseudo trop court (min 3 caractères)", "var(--red)");
-                return;
+            const pseudo = document.getElementById('pseudo').value;
+            const password = document.getElementById('pass').value;
+            socket.emit('login_action', {pseudo, password, type});
+        }
+
+        socket.on('login_ok', d => {
+            myName = d.pseudo;
+            document.getElementById('auth-overlay').style.display = 'none';
+            updateUI(d);
+            toast("Connecté !", "var(--green)");
+        });
+
+        // --- SOCIAL FUNCTIONS ---
+        function addFriend() {
+            const p = document.getElementById('friend-input').value;
+            if(p) {
+                socket.emit('add_friend', {pseudo: p});
+                document.getElementById('friend-input').value = "";
             }
-            if(!pw || pw.length < 3) {
-                toast("Mot de passe trop court", "var(--red)");
-                return;
-            }
-            
-            if (!isConnected) {
-                toast("Connexion au serveur en cours...", "var(--red)");
-                return;
-            }
-            
-            console.log("📤 Envoi de login_action:", {pseudo: p, type: type});
-            socket.emit('login_action', {pseudo: p, password: pw, type: type});
+        }
+
+        function createGuild() {
+            const n = document.getElementById('guild-input').value;
+            if(n) socket.emit('create_guild', {name: n});
         }
 
         function sendChat() {
             const i = document.getElementById('chat-input');
-            if(i.value.trim()) {
-                console.log("💬 Envoi du message:", i.value);
-                socket.emit('send_chat', {msg: i.value});
-                i.value = "";
-            }
+            if(i.value) { socket.emit('send_chat', {msg: i.value}); i.value = ""; }
         }
 
-        function buyUpgrade(type) {
-            console.log("🛒 Achat:", type);
-            socket.emit('buy_upgrade', {type: type});
-        }
-
-        // --- ECOUTEURS SOCKET ---
-
-        socket.on('login_ok', d => {
-            console.log("✅ Connexion réussie:", d);
-            myName = d.pseudo;
-            document.getElementById('auth-overlay').style.display = 'none';
-            updateUI(d);
-            toast("Bienvenue " + d.pseudo + " !", "var(--green)");
-        });
-
-        socket.on('update_score', d => {
-            console.log("📊 Score mis à jour:", d);
-            updateUI(d);
-        });
-        
-        socket.on('update_full_state', d => {
-            console.log("🔄 État complet mis à jour:", d);
-            updateUI(d);
-        });
-
-        socket.on('new_chat', d => {
-            console.log("💬 Nouveau message:", d);
-            const b = document.getElementById('chat-box');
-            const m = document.createElement('div');
-            m.className = "msg";
-            m.innerHTML = `<small style="color:#666">${d.time}</small> <b>${d.user}:</b> ${d.text}`;
-            b.appendChild(m);
-            b.scrollTop = b.scrollHeight;
-        });
-
-        socket.on('leaderboard_update', d => {
-            console.log("🏆 Classement mis à jour:", d);
-            document.getElementById('leaderboard-list').innerHTML = d.players.map(p => `
-                <div class="lb-item ${p.pseudo === myName ? 'me' : ''}">
-                    <span>#${p.rank} ${p.pseudo}</span>
-                    <b>${Math.floor(p.clicks).toLocaleString()}</b>
-                </div>
-            `).join('') || '<p style="text-align:center; color:#666">Aucun joueur</p>';
-        });
-
-        socket.on('success', m => {
-            console.log("✅ Succès:", m);
-            toast(m, 'var(--green)');
-        });
-        
-        socket.on('error', m => {
-            console.error("❌ Erreur:", m);
-            toast(m, 'var(--red)');
-        });
-
-        // --- FONCTIONS UI ---
+        // --- UPDATES ---
+        socket.on('update_score', d => updateUI(d));
+        socket.on('update_full_state', d => updateUI(d));
 
         function updateUI(d) {
             if(d.pseudo) document.getElementById('my-name').innerText = d.pseudo;
             if(d.clicks !== undefined) document.getElementById('score-text').innerText = Math.floor(d.clicks).toLocaleString();
             if(d.rank) document.getElementById('my-rank').innerText = d.rank;
+            if(d.mult) document.getElementById('mult-text').innerText = d.mult;
+            if(d.auto !== undefined) document.getElementById('auto-text').innerText = d.auto;
             
-            if(d.mult !== undefined) {
-                document.getElementById('mult-text').innerText = d.mult;
-                document.getElementById('cost-text').innerText = (d.mult * 200).toLocaleString();
-            }
-            
-            if(d.auto !== undefined) {
-                document.getElementById('auto-text').innerText = d.auto;
-                document.getElementById('auto-cost-text').innerText = ((d.auto + 1) * 750).toLocaleString();
+            if(d.guild) {
+                document.getElementById('my-guild-tag').innerText = `[${d.guild.toUpperCase()}]`;
+                document.getElementById('guild-section').innerHTML = `<p style="text-align:center">Membre de : <b>${d.guild}</b></p>`;
             }
         }
 
+        socket.on('leaderboard_update', d => {
+            document.getElementById('leaderboard-list').innerHTML = d.players.map(p => `
+                <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #222;">
+                    <span>${p.pseudo}</span><b>${Math.floor(p.clicks).toLocaleString()}</b>
+                </div>
+            `).join('');
+        });
+
+        socket.on('new_chat', d => {
+            const box = document.getElementById('chat-box');
+            box.innerHTML += `<div class="msg"><b>${d.user}:</b> ${d.text}</div>`;
+            box.scrollTop = box.scrollHeight;
+        });
+
+        // --- UI UTILS ---
         function tab(id, el) {
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
@@ -248,15 +191,14 @@
         }
 
         function toast(m, c) {
-            console.log("🔔 Toast:", m);
             const t = document.getElementById('toast');
-            t.innerText = m; 
-            t.style.background = c; 
-            t.style.display = 'block';
+            t.innerText = m; t.style.background = c; t.style.display = 'block';
             setTimeout(() => t.style.display='none', 3000);
         }
 
-        console.log("✅ Script chargé avec succès");
+        socket.on('success', m => toast(m, "var(--green)"));
+        socket.on('error', m => toast(m, "var(--red)"));
+        socket.on('connect', () => document.getElementById('status').innerText = "Serveur en ligne");
     </script>
 </body>
 </html>
