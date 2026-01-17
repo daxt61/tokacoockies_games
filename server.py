@@ -149,7 +149,7 @@ def get_rank(clicks):
 def check_achievements(pseudo, clicks=0, friends_count=0, mult=1, prestige=0, streak=0):
     """Check and unlock achievements"""
     try:
-        res = supabase.table("user_achievements").select("achievement_id").eq("user_pseudo", pseudo).execute()
+        res = supabase.rpc('get_relative_leaderboard', {'p_player_pseudo': pseudo}).execute()
         unlocked = [a['achievement_id'] for a in res.data]
         newly_unlocked = []
         
