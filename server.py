@@ -4,7 +4,7 @@ import time
 import json
 from datetime import datetime
 
-# --- INITIALISATION CRITIQUE ---
+# --- INITIALISATION CRITIQUE ----
 # Le monkey_patch doit être AVANT tout autre import pour éviter les plantages Render
 eventlet.monkey_patch()
 
