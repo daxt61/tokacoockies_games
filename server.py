@@ -1,10 +1,11 @@
 import os
 import eventlet
 import time
+import json
 from datetime import datetime
 
-# --- PATCH DE COMPATIBILITÉ ---
-# Doit être AVANT Flask et SocketIO
+# --- INITIALISATION CRITIQUE ---
+# Le monkey_patch doit être AVANT tout autre import pour éviter les plantages Render
 eventlet.monkey_patch()
 
 from flask import Flask, render_template, request, jsonify
@@ -12,98 +13,114 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_bcrypt import Bcrypt
 from supabase import create_client, Client
 
-# --- CONFIGURATION DE L'APPLICATION ---
-# On définit explicitement les dossiers pour Render
-app = Flask(__name__, 
-            template_folder='.',     # Dit à Flask que l'index.html est à la racine
-            static_folder='static')  # Si tu as un dossier static
-
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tokacookies_v17_mega_final')
+# --- CONFIGURATION FLASK & SOCKETIO ---
+# Ici on ne précise rien, donc Flask cherche dans le dossier 'templates' par défaut
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'toka_ultra_secret_2026')
 bcrypt = Bcrypt(app)
 
-# SocketIO avec eventlet pour le temps réel
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# On active le mode async eventlet pour supporter des centaines de joueurs
+socketio = SocketIO(app, 
+                    cors_allowed_origins="*", 
+                    async_mode='eventlet', 
+                    ping_timeout=10, 
+                    ping_interval=5)
 
-# --- CONFIGURATION BASE DE DONNÉES (SUPABASE) ---
+# --- CONFIGURATION SUPABASE ---
 SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
-# On force la clé ici pour éviter l'erreur de déploiement Render
+# On force la clé en dur pour éliminer l'erreur 'supabase_key is required' de Render
 SUPABASE_KEY = "sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao"
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ [DATABASE] Connecté à Supabase")
+    print("✅ [SYSTEM] Base de données connectée.")
 except Exception as e:
-    print(f"❌ [DATABASE] Erreur de connexion : {e}")
+    print(f"❌ [SYSTEM] Erreur de connexion DB : {e}")
 
-# Mémoire vive : joueurs connectés
-connected_users = {}
+# Mémoire vive (RAM) du serveur
+connected_users = {} # { sid: { data } }
+server_stats = {"total_clicks_session": 0, "start_time": time.time()}
 
-# --- SYSTÈME DE TITRES (PROGRESSION) ---
-def get_title(score):
-    if score >= 1000000: return "👑 Divinité du Cookie"
-    if score >= 500000: return "💎 Maître Suprême"
-    if score >= 100000: return "🔱 Grand Seigneur"
-    if score >= 50000: return "🛡️ Chevalier"
-    if score >= 10000: return "⚔️ Guerrier"
-    if score >= 1000: return "🌾 Boulanger"
-    return "👞 Vagabond"
+# --- LOGIQUE DE JEU AVANCÉE ---
 
-# --- BOUCLE AUTOMATIQUE (CPS / AUTO-CLICK) ---
-def auto_click_process():
-    """Ajoute les clics passifs toutes les secondes en base de données"""
-    print("🚀 [WORKER] Boucle de clics automatiques activée")
+def get_rank_info(clicks):
+    """Calcule le rang et le bonus associé"""
+    if clicks >= 1000000: return "👑 Divinité", 2.0
+    if clicks >= 500000:  return "💎 Maître", 1.5
+    if clicks >= 100000:  return "🔱 Seigneur", 1.2
+    if clicks >= 10000:   return "⚔️ Guerrier", 1.1
+    return "👞 Vagabond", 1.0
+
+def log_event(msg):
+    """Affiche un log propre dans la console Render"""
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] {msg}")
+
+# --- BOUCLE DE FOND (AUTO-CLICK / CPS) ---
+
+def background_cps_worker():
+    """Gère les revenus passifs de tous les joueurs connectés chaque seconde"""
+    log_event("🚀 Worker CPS démarré")
     while True:
-        eventlet.sleep(1)
-        for sid, data in list(connected_users.items()):
-            if data.get('auto', 0) > 0:
+        eventlet.sleep(1) # Pause d'une seconde
+        
+        # On itère sur une copie pour éviter les erreurs si qqun se déconnecte
+        for sid, user in list(connected_users.items()):
+            if user.get('auto', 0) > 0:
                 try:
-                    # Lecture du score actuel
-                    user_res = supabase.table("users").select("clicks").eq("pseudo", data['pseudo']).execute()
-                    if user_res.data:
-                        current = user_res.data[0]['clicks']
-                        new_score = current + data['auto']
-                        # Mise à jour
-                        supabase.table("users").update({"clicks": new_score}).eq("pseudo", data['pseudo']).execute()
-                        # Envoi au joueur
+                    # 1. Récupérer score actuel
+                    res = supabase.table("users").select("clicks").eq("pseudo", user['pseudo']).execute()
+                    if res.data:
+                        current = res.data[0]['clicks']
+                        # 2. Ajouter le CPS
+                        new_score = current + user['auto']
+                        # 3. Sauvegarder
+                        supabase.table("users").update({"clicks": new_score}).eq("pseudo", user['pseudo']).execute()
+                        # 4. Notifier le joueur
+                        rank_name, _ = get_rank_info(new_score)
                         socketio.emit('update_score', {
-                            'clicks': new_score, 
-                            'rank': get_title(new_score)
+                            'clicks': new_score,
+                            'rank': rank_name
                         }, room=sid)
                 except Exception as e:
-                    print(f"⚠️ [CPS] Erreur pour {data['pseudo']}: {e}")
+                    log_event(f"⚠️ Erreur CPS ({user['pseudo']}): {e}")
 
-# Lancement du processus en arrière-plan
-eventlet.spawn(auto_click_process)
+# Lancement du thread CPS
+eventlet.spawn(background_cps_worker)
 
-# --- ROUTES RENDU HTML ---
+# --- ROUTES HTTP ---
 
 @app.route('/')
-def home():
-    """Sert le fichier index.html situé à la racine du projet"""
-    try:
-        # On essaie de servir index(3).html ou index.html selon ton renommage
-        return render_template('index.html') 
-    except:
-        return "⚠️ Erreur : Fichier index.html introuvable à la racine du projet."
+def index():
+    """Cette route cherche index.html dans le dossier /templates"""
+    log_event(f"🌐 Accès page d'accueil par {request.remote_addr}")
+    return render_template('index.html')
 
-@app.route('/health')
-def health():
-    return jsonify({"status": "online"}), 200
+@app.route('/status')
+def status():
+    """Route de diagnostic pour vérifier si le serveur est vivant"""
+    uptime = time.time() - server_stats["start_time"]
+    return jsonify({
+        "status": "online",
+        "players_online": len(connected_users),
+        "uptime_seconds": int(uptime)
+    })
 
-# --- GESTION DES SOCKETS (LOGIQUE JEU) ---
+# --- EVENEMENTS SOCKET.IO ---
 
 @socketio.on('login_action')
-def on_login(data):
+def handle_login(data):
     pseudo = data.get('pseudo', '').strip()
     password = data.get('password', '')
     
-    if not pseudo: return emit('error', "Pseudo vide !")
+    if not pseudo or len(pseudo) < 3:
+        return emit('error', "Pseudo trop court (min 3 car.)")
 
-    # Recherche utilisateur
+    # Vérification DB
     res = supabase.table("users").select("*").eq("pseudo", pseudo).execute()
     
     if data['type'] == 'register':
-        if res.data: return emit('error', "Ce pseudo est déjà pris.")
+        if res.data: return emit('error', "Pseudo déjà pris !")
         
         hashed = bcrypt.generate_password_hash(password).decode('utf-8')
         new_u = {
@@ -111,92 +128,115 @@ def on_login(data):
             "multiplier": 1, "auto_clicker": 0, "guild_name": None
         }
         supabase.table("users").insert(new_u).execute()
+        log_event(f"🆕 Nouveau joueur : {pseudo}")
         emit('success', "Compte créé ! Connecte-toi.")
     
     else: # LOGIN
-        if not res.data: return emit('error', "Utilisateur inexistant.")
+        if not res.data: return emit('error', "Joueur inconnu.")
         user = res.data[0]
         
         if bcrypt.check_password_hash(user['password'], password):
-            # Session active
+            # Stockage session
             connected_users[request.sid] = {
-                'pseudo': pseudo, 'mult': user['multiplier'], 
+                'pseudo': pseudo, 'mult': user['multiplier'],
                 'auto': user['auto_clicker'], 'guild': user['guild_name']
             }
             join_room(pseudo)
             
+            rank_name, _ = get_rank_info(user['clicks'])
             emit('login_ok', {
                 'pseudo': pseudo, 'clicks': user['clicks'],
                 'mult': user['multiplier'], 'auto': user['auto_clicker'],
-                'guild': user['guild_name'], 'rank': get_title(user['clicks'])
+                'guild': user['guild_name'], 'rank': rank_name
             })
-            update_leaderboard()
+            log_event(f"🔑 {pseudo} s'est connecté.")
+            send_leaderboard()
         else:
-            emit('error', "Mauvais mot de passe.")
+            emit('error', "Mot de passe incorrect.")
 
 @socketio.on('add_click')
-def on_click():
+def handle_click():
     u = connected_users.get(request.sid)
     if not u: return
     
-    res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
-    new_val = res.data[0]['clicks'] + u['mult']
-    
-    supabase.table("users").update({"clicks": new_val}).eq("pseudo", u['pseudo']).execute()
-    emit('update_score', {'clicks': new_val, 'rank': get_title(new_val)})
+    try:
+        # On récupère le score pour éviter la triche côté client
+        res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
+        current_clicks = res.data[0]['clicks']
+        
+        # Calcul du gain
+        rank_name, bonus = get_rank_info(current_clicks)
+        gain = int(u['mult'] * bonus)
+        new_total = current_clicks + gain
+        
+        # Update
+        supabase.table("users").update({"clicks": new_total}).eq("pseudo", u['pseudo']).execute()
+        server_stats["total_clicks_session"] += gain
+        
+        emit('update_score', {'clicks': new_total, 'rank': rank_name})
+    except Exception as e:
+        log_event(f"❌ Erreur clic : {e}")
 
 @socketio.on('buy_upgrade')
-def on_buy(data):
+def handle_buy(data):
     u = connected_users.get(request.sid)
     if not u: return
     
     res = supabase.table("users").select("*").eq("pseudo", u['pseudo']).execute().data[0]
     
     if data['type'] == 'mult':
-        cost = res['multiplier'] * 150
+        cost = res['multiplier'] * 200
         if res['clicks'] >= cost:
             new_m = res['multiplier'] + 1
             new_c = res['clicks'] - cost
             supabase.table("users").update({"clicks": new_c, "multiplier": new_m}).eq("pseudo", u['pseudo']).execute()
             u['mult'] = new_m
             emit('update_full_state', {'clicks': new_c, 'mult': new_m})
-        else: emit('error', "Pas assez de cookies !")
+            emit('success', f"Multiplicateur : x{new_m}")
+        else: emit('error', f"Besoin de {cost} cookies !")
 
     elif data['type'] == 'auto':
-        cost = (res['auto_clicker'] + 1) * 600
+        cost = (res['auto_clicker'] + 1) * 750
         if res['clicks'] >= cost:
             new_a = res['auto_clicker'] + 1
             new_c = res['clicks'] - cost
             supabase.table("users").update({"clicks": new_c, "auto_clicker": new_a}).eq("pseudo", u['pseudo']).execute()
             u['auto'] = new_a
             emit('update_full_state', {'clicks': new_c, 'auto': new_a})
-        else: emit('error', "Pas assez de cookies !")
-
-# --- SYSTÈME SOCIAL ---
+            emit('success', f"CPS augmenté à {new_a} !")
+        else: emit('error', f"Besoin de {cost} cookies !")
 
 @socketio.on('send_chat')
-def on_chat(data):
+def handle_chat(data):
     u = connected_users.get(request.sid)
-    if not u or not data.get('msg'): return
-    
-    socketio.emit('new_chat', {
-        'user': u['pseudo'], 
-        'text': data['msg'][:120], 
-        'guild': u['guild']
-    })
+    if not u: return
+    msg = data.get('msg', '').strip()
+    if msg:
+        socketio.emit('new_chat', {
+            'user': u['pseudo'], 
+            'text': msg[:100], 
+            'guild': u['guild'],
+            'time': datetime.now().strftime("%H:%M")
+        })
 
-def update_leaderboard():
-    res = supabase.table("users").select("pseudo, clicks").order("clicks", desc=True).limit(10).execute()
-    socketio.emit('leaderboard_update', {'players': res.data})
+def send_leaderboard():
+    """Envoie le Top 10 mondial"""
+    try:
+        res = supabase.table("users").select("pseudo, clicks").order("clicks", desc=True).limit(10).execute()
+        socketio.emit('leaderboard_update', {'players': res.data})
+    except: pass
 
 @socketio.on('disconnect')
-def on_disconnect():
+def handle_disconnect():
     if request.sid in connected_users:
+        u = connected_users[request.sid]
+        log_event(f"👋 Déconnexion : {u['pseudo']}")
         del connected_users[request.sid]
 
-# --- DÉMARRAGE ---
+# --- LANCEMENT DU SERVEUR ---
+
 if __name__ == '__main__':
-    # PORT est géré automatiquement par Render
+    # Le port est injecté par Render, sinon 5000 par défaut
     port = int(os.environ.get('PORT', 5000))
-    print(f"🌍 Serveur démarré sur le port {port}")
+    log_event(f"🌍 Serveur Toka Cookies en ligne sur le port {port}")
     socketio.run(app, host='0.0.0.0', port=port)
