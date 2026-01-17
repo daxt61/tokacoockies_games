@@ -29,7 +29,7 @@ socketio = SocketIO(app,
 # --- CONFIGURATION SUPABASE ---
 SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
 # On force la clé en dur pour éliminer l'erreur 'supabase_key is required' de Render
-SUPABASE_KEY = "sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao"
+SUPABASE_KEY = "sb_publishable_HRzjEt_BXzTE2sr4vJfkPQ_EGxN6yTJ"
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
