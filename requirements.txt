@@ -1,8 +1,8 @@
-flask==3.0.0
-flask-socketio==5.3.5
+flask==3.0.3
+flask-socketio==5.3.6
 flask-bcrypt==1.0.1
 supabase==2.9.1
 httpx>=0.26,<0.28
 eventlet==0.35.2
-gunicorn==21.2.0
-python-dotenv==1.0.0
+gunicorn==22.0.0
+python-dotenv==1.0.1
