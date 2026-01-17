@@ -23,9 +23,11 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 # --- CONFIG SUPABASE ---
 SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
 # Note: Idéalement, utilise os.environ.get('SUPABASE_KEY')
-SUPABASE_KEY = os.environ.get('sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao')
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# Cherche d'abord dans les variables d'environnement, sinon utilise la clé en dur
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY') or "sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao"
 
+if not SUPABASE_KEY:
+    raise ValueError("ERREUR : La SUPABASE_KEY est manquante !")
 # Stockage des sessions en mémoire vive
 connected_users = {}
 
