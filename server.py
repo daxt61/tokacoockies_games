@@ -20,8 +20,8 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- CONFIG SUPABASE ---
 # CORRECTION BUG #1 : Utiliser des variables d'environnement
-SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://rzzhkdzjnjeeoqbtlles.supabase.co')
-SUPABASE_KEY = os.environ.get('SUPABASE_KEY', '')  # NE JAMAIS hardcoder la clé !
+SUPABASE_URL = ('https://rzzhkdzjnjeeoqbtlles.supabase.co')
+SUPABASE_KEY = ('sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao')  # NE JAMAIS hardcoder la clé !
 
 if not SUPABASE_KEY:
     print("⚠️  WARNING: SUPABASE_KEY non définie !")
