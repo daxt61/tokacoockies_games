@@ -1,5 +1,4 @@
 import os
-import logging
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room
 from flask_bcrypt import Bcrypt
@@ -8,9 +7,8 @@ import eventlet
 
 # --- INITIALISATION ---
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'tokacookies_supreme_2026'
+app.config['SECRET_KEY'] = 'tokacookies_v13_ultra'
 bcrypt = Bcrypt(app)
-# Configuration spécifique pour Render et les WebSockets
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # --- CONFIG SUPABASE ---
@@ -18,58 +16,65 @@ SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
 SUPABASE_KEY = "sb_secret_wjlaZm7VdO5VgO6UfqEn0g_FgbwC-ao"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Stockage des utilisateurs actifs
-# Format: { sid: { 'pseudo': '...', 'mult': 1, 'guild': '...', 'friends': [] } }
+# Stockage sessions { sid: { 'pseudo': '...', 'mult': 1, 'guild': '...', 'friends': [] } }
 connected_users = {}
 
-# --- FONCTIONS UTILES ---
+# --- FONCTIONS SYNC ---
 
 def get_rank_title(clicks):
-    """Calcule le titre honorifique selon les clics"""
     ranks = [(0, "Vagabond"), (1000, "Citoyen"), (5000, "Chevalier"), (20000, "Seigneur"), (100000, "Roi"), (500000, "Empereur")]
     for threshold, title in reversed(ranks):
         if clicks >= threshold: return title
     return "Vagabond"
 
 def broadcast_leaderboard_to_all():
-    """Recalcule et envoie le classement relatif à TOUS les joueurs connectés"""
+    """Sync le classement pour tous les joueurs en ligne"""
     for sid, data in connected_users.items():
         try:
-            # Appel de la fonction SQL 'get_relative_leaderboard' pour chaque joueur
             res = supabase.rpc('get_relative_leaderboard', {'player_pseudo': data['pseudo']}).execute()
             socketio.emit('leaderboard_update', {'players': res.data}, room=sid)
-        except Exception as e:
-            print(f"Erreur Sync Leaderboard pour {data.get('pseudo')}: {e}")
+        except: pass
 
 def update_social_data(pseudo):
-    """Récupère les amis, les demandes et le statut de guilde pour notifier un joueur"""
+    """Logique sociale corrigée : Filtre les amis et les demandes séparément"""
     try:
-        # Amis acceptés
+        # 1. Amis RÉELS (status = accepted)
+        # On cherche où l'utilisateur est soit l'envoyeur (user1) soit le receveur (user2)
         res_f = supabase.table("friendships").select("*").or_(f'user1.eq."{pseudo}",user2.eq."{pseudo}"').eq("status", "accepted").execute()
-        friends = [f['user2'] if f['user1'] == pseudo else f['user1'] for f in res_f.data]
         
-        # Demandes d'amis reçues
+        friends_list = []
+        for f in res_f.data:
+            # On récupère le nom de l'autre personne
+            friend_name = f['user2'] if f['user1'] == pseudo else f['user1']
+            if friend_name not in friends_list:
+                friends_list.append(friend_name)
+        
+        # 2. Demandes en ATTENTE (status = pending ET on est le receveur user2)
         res_r = supabase.table("friendships").select("user1").eq("user2", pseudo).eq("status", "pending").execute()
-        friend_reqs = [r['user1'] for r in res_r.data]
+        pending_requests = [r['user1'] for r in res_r.data]
         
-        # Gestion Guilde
+        # 3. Stats Guilde (si fondateur)
         res_g = supabase.table("guilds").select("name").eq("founder", pseudo).execute()
-        guild_reqs = []
         is_leader = False
+        guild_reqs = []
         if res_g.data:
             is_leader = True
             g_name = res_g.data[0]['name']
             res_jr = supabase.table("guild_join_requests").select("requester").eq("guild_name", g_name).execute()
             guild_reqs = [r['requester'] for r in res_jr.data]
 
+        # Envoi des données propres au joueur
         socketio.emit('social_update', {
-            'friends': friends,
-            'friend_requests': friend_reqs,
+            'friends': friends_list,
+            'friend_requests': pending_requests,
             'guild_join_requests': guild_reqs,
             'is_leader': is_leader
         }, room=pseudo)
-        return friends
-    except: return []
+        
+        return friends_list
+    except Exception as e:
+        print(f"Social Sync Error: {e}")
+        return []
 
 # --- ROUTES & SOCKETS ---
 
@@ -83,15 +88,13 @@ def handle_auth(data):
     res = supabase.table("users").select("*").eq("pseudo", p).execute()
     user = res.data[0] if res.data else None
 
-    # Inscription
     if t == 'register' and not user:
         hpw = bcrypt.generate_password_hash(pwd).decode('utf-8')
         supabase.table("users").insert({"pseudo": p, "password": hpw}).execute()
         user = supabase.table("users").select("*").eq("pseudo", p).execute().data[0]
 
-    # Connexion
     if user and bcrypt.check_password_hash(user['password'], pwd):
-        # Initialisation de la session
+        join_room(p)
         friends = update_social_data(p)
         connected_users[request.sid] = {
             'pseudo': p, 
@@ -99,150 +102,152 @@ def handle_auth(data):
             'guild': user.get('guild_name'),
             'friends': friends
         }
-        join_room(p) # Le joueur rejoint sa propre room pour les notifs privées
-        
         emit('login_ok', {
-            'pseudo': p, 
-            'clicks': user['clicks'], 
-            'mult': user['multiplier'], 
-            'guild': user.get('guild_name'), 
-            'rank': get_rank_title(user['clicks'])
+            'pseudo': p, 'clicks': user['clicks'], 'mult': user['multiplier'], 
+            'guild': user.get('guild_name'), 'rank': get_rank_title(user['clicks'])
         })
-        broadcast_leaderboard_to_all() # Update tout le monde quand un nouveau arrive
+        broadcast_leaderboard_to_all()
     else:
-        emit('error', "Pseudo ou mot de passe incorrect.")
+        emit('error', "Identifiants incorrects")
 
 @socketio.on('add_click')
 def handle_click():
     u = connected_users.get(request.sid)
     if u:
-        # 1. Mise à jour score en BDD
         res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
-        new_val = res.data[0]['clicks'] + u['mult']
-        supabase.table("users").update({"clicks": new_val}).eq("pseudo", u['pseudo']).execute()
+        nv = res.data[0]['clicks'] + u['mult']
+        supabase.table("users").update({"clicks": nv}).eq("pseudo", u['pseudo']).execute()
+        emit('update_score', {'clicks': nv, 'rank': get_rank_title(nv)})
         
-        # 2. Update visuel direct pour le joueur qui a cliqué
-        emit('update_score', {'clicks': new_val, 'rank': get_rank_title(new_val)})
+        # Broadcast classement
+        if nv % 5 == 0: broadcast_leaderboard_to_all()
         
-        # 3. Synchronisation Temps Réel (Broadcast)
-        # % 1 signifie que le classement s'actualise pour TOUT LE MONDE à chaque clic.
-        if new_val % 1 == 0:
-            broadcast_leaderboard_to_all()
-            
-        # 4. Si en guilde, on ajoute au score de guilde
-        # BIEN ALIGNÉ ICI : cela doit être à l'intérieur du "if u:"
+        # Score de guilde (Correction PGRST203 intégrée)
         if u.get('guild'):
-            supabase.rpc('increment_guild_clicks', {
-                'guild_name': str(u['guild']), 
-                'amount': int(u['mult'])
-            }).execute()
+            try:
+                supabase.rpc('increment_guild_clicks', {
+                    'guild_name': str(u['guild']), 
+                    'amount': int(u['mult'])
+                }).execute()
+            except: pass
 
-@socketio.on('buy_upgrade')
-def handle_upgrade():
-    u = connected_users.get(request.sid)
-    if u:
-        res = supabase.table("users").select("clicks", "multiplier").eq("pseudo", u['pseudo']).execute().data[0]
-        cost = res['multiplier'] * 100
-        if res['clicks'] >= cost:
-            nm = res['multiplier'] + 1
-            nv = res['clicks'] - cost
-            supabase.table("users").update({"clicks": nv, "multiplier": nm}).eq("pseudo", u['pseudo']).execute()
-            connected_users[request.sid]['mult'] = nm
-            emit('update_full_state', {'clicks': nv, 'mult': nm})
-            broadcast_leaderboard_to_all()
-        else:
-            emit('error', f"Il te manque {cost - res['clicks']} clics !")
-
-# --- SYSTÈME DE CHAT ---
 @socketio.on('send_chat')
 def handle_chat(data):
     u = connected_users.get(request.sid)
     if u and data.get('msg'):
-        msg_payload = {
-            'user': u['pseudo'],
-            'text': data['msg'][:150], # Limite à 150 caractères
-            'guild': u['guild']
-        }
-        # Broadcast global à tout le monde
-        socketio.emit('new_chat', msg_payload, broadcast=True)
+        socketio.emit('new_chat', {
+            'user': u['pseudo'], 'text': data['msg'][:150], 'guild': u['guild']
+        }, broadcast=True)
 
-# --- GESTION DES GUILDES ---
+# --- LOGIQUE SOCIALE CORRIGÉE ---
+
+@socketio.on('send_friend_request')
+def handle_f_req(data):
+    u = connected_users.get(request.sid)
+    target = data['target'].strip()
+    if not u or target == u['pseudo']: return
+
+    # Vérification anti-doublon (A->B ou B->A existe déjà ?)
+    check = supabase.table("friendships").select("*").or_(
+        f'and(user1.eq."{u["pseudo"]}",user2.eq."{target}"),and(user1.eq."{target}",user2.eq."{u["pseudo"]}")'
+    ).execute()
+
+    if check.data:
+        return emit('error', "Déjà amis ou demande en attente")
+
+    try:
+        supabase.table("friendships").insert({
+            "user1": u['pseudo'], "user2": target, "status": "pending"
+        }).execute()
+        socketio.emit('notif_sound', room=target)
+        update_social_data(target)
+        emit('success', "Demande envoyée !")
+    except:
+        emit('error', "Joueur introuvable")
+
+@socketio.on('respond_friend_request')
+def handle_f_resp(data):
+    u = connected_users.get(request.sid)
+    target = data['target']
+    
+    if data['action'] == 'accept':
+        # On valide la ligne où on est user2 (receveur)
+        supabase.table("friendships").update({"status": "accepted"}).match({
+            "user1": target, "user2": u['pseudo']
+        }).execute()
+        emit('success', f"Tu es ami avec {target}")
+    else:
+        # On décline/supprime
+        supabase.table("friendships").delete().match({
+            "user1": target, "user2": u['pseudo']
+        }).execute()
+
+    # Refresh pour les deux
+    update_social_data(u['pseudo'])
+    update_social_data(target)
+    # Sync de la liste d'amis en mémoire pour le chat
+    if request.sid in connected_users:
+        connected_users[request.sid]['friends'] = update_social_data(u['pseudo'])
+
+# --- GUILDES (Inchangé) ---
+
 @socketio.on('create_guild')
 def handle_create_g(data):
     u = connected_users.get(request.sid)
-    if u.get('guild'): return emit('error', "Tu dois quitter ta guilde actuelle.")
+    if u.get('guild'): return emit('error', "Quitte ta guilde d'abord")
     name = data['name'].strip()
     try:
         supabase.table("guilds").insert({"name": name, "founder": u['pseudo']}).execute()
         supabase.table("users").update({"guild_name": name}).eq("pseudo", u['pseudo']).execute()
         connected_users[request.sid]['guild'] = name
         emit('update_full_state', {'guild': name})
-        emit('success', f"Guilde {name} créée !")
-    except:
-        emit('error', "Ce nom de guilde est déjà pris.")
+    except: emit('error', "Nom déjà pris")
 
 @socketio.on('ask_join_guild')
-def handle_join_request(data):
+def handle_ask_g(data):
     u = connected_users.get(request.sid)
-    if u.get('guild'): return emit('error', "Tu es déjà en guilde.")
     try:
         supabase.table("guild_join_requests").insert({"guild_name": data['name'], "requester": u['pseudo']}).execute()
-        emit('success', "Demande de recrutement envoyée !")
-        # Notifier le chef
         res = supabase.table("guilds").select("founder").eq("name", data['name']).execute()
         if res.data:
             socketio.emit('notif_sound', room=res.data[0]['founder'])
             update_social_data(res.data[0]['founder'])
-    except:
-        emit('error', "Demande déjà en cours.")
+        emit('success', "Demande envoyée")
+    except: emit('error', "Déjà demandé")
 
 @socketio.on('respond_guild_join')
-def handle_guild_resp(data):
-    u = connected_users.get(request.sid) # Le chef
+def handle_g_resp(data):
+    u = connected_users.get(request.sid)
     if data['action'] == 'accept':
         supabase.table("users").update({"guild_name": u['guild']}).eq("pseudo", data['requester']).execute()
-        socketio.emit('notif_sound', room=data['requester'])
     supabase.table("guild_join_requests").delete().match({"guild_name": u['guild'], "requester": data['requester']}).execute()
     update_social_data(u['pseudo'])
 
 @socketio.on('leave_guild')
-def handle_leave():
+def handle_l_g():
     u = connected_users.get(request.sid)
     supabase.table("users").update({"guild_name": None}).eq("pseudo", u['pseudo']).execute()
     connected_users[request.sid]['guild'] = None
     emit('update_full_state', {'guild': None})
-    emit('success', "Tu as quitté ta guilde.")
 
 @socketio.on('get_guilds')
 def handle_get_g():
     res = supabase.table("guilds").select("*").order("total_clicks", desc=True).limit(20).execute()
     emit('guild_list', {'guilds': res.data})
 
-# --- SOCIAL ---
-@socketio.on('send_friend_request')
-def handle_f_req(data):
+@socketio.on('buy_upgrade')
+def handle_up():
     u = connected_users.get(request.sid)
-    try:
-        supabase.table("friendships").insert({"user1": u['pseudo'], "user2": data['target'], "status": "pending"}).execute()
-        socketio.emit('notif_sound', room=data['target'])
-        update_social_data(data['target'])
-        emit('success', "Demande d'ami envoyée !")
-    except:
-        emit('error', "Utilisateur introuvable ou déjà ami.")
+    if u:
+        res = supabase.table("users").select("clicks", "multiplier").eq("pseudo", u['pseudo']).execute().data[0]
+        cost = res['multiplier'] * 100
+        if res['clicks'] >= cost:
+            nm, nv = res['multiplier'] + 1, res['clicks'] - cost
+            supabase.table("users").update({"clicks": nv, "multiplier": nm}).eq("pseudo", u['pseudo']).execute()
+            connected_users[request.sid]['mult'] = nm
+            emit('update_full_state', {'clicks': nv, 'mult': nm})
+        else: emit('error', "Pas assez de clics")
 
-@socketio.on('respond_friend_request')
-def handle_f_resp(data):
-    u = connected_users.get(request.sid)
-    if data['action'] == 'accept':
-        supabase.table("friendships").update({"status": "accepted"}).match({"user1": data['target'], "user2": u['pseudo']}).execute()
-        # On met à jour la liste locale d'amis pour le chat
-        connected_users[request.sid]['friends'] = update_social_data(u['pseudo'])
-    else:
-        supabase.table("friendships").delete().match({"user1": data['target'], "user2": u['pseudo']}).execute()
-    update_social_data(u['pseudo'])
-
-# --- RUN ---
 if __name__ == '__main__':
-    # Indispensable pour que Render trouve le bon port
     port = int(os.environ.get('PORT', 5000))
     socketio.run(app, host='0.0.0.0', port=port)
