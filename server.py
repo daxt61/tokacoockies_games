@@ -203,21 +203,25 @@ def check_achievements(pseudo, clicks=0, friends_count=0, mult=1, prestige=0, st
         return []
 
 def send_leaderboard(sid=None):
+    """Envoie le classement : relatif si sid est fourni, sinon Top 10 global"""
     try:
+        # SI un SID est fourni, on cherche les voisins du joueur (Relatif)
         if sid and sid in connected_users:
             pseudo = connected_users[sid]['pseudo']
-            # Appel de la nouvelle fonction RPC
+            # On appelle la fonction RPC que tu as créée dans Supabase
             res = supabase.rpc('get_relative_leaderboard', {'p_player_pseudo': pseudo}).execute()
             
+            # Si la fonction RPC ne renvoie rien, on bascule sur le Top 10
             if not res.data:
-                # Backup si le joueur n'a pas encore de score
                 res = supabase.table("users").select("pseudo, clicks, guild_name, prestige_level").order("clicks", desc=True).limit(10).execute()
             
             socketio.emit('leaderboard_update', {'players': res.data, 'type': 'relative'}, room=sid)
+        
+        # SINON (ou pour la mise à jour globale), on envoie le Top 10
         else:
-            # Top 10 classique pour le broadcast global
             res = supabase.table("users").select("pseudo, clicks, guild_name, prestige_level").order("clicks", desc=True).limit(10).execute()
             socketio.emit('leaderboard_update', {'players': res.data, 'type': 'global'})
+            
     except Exception as e:
         logger.error(f"Leaderboard error: {e}")
 
