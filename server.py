@@ -121,16 +121,21 @@ def handle_click():
         new_val = res.data[0]['clicks'] + u['mult']
         supabase.table("users").update({"clicks": new_val}).eq("pseudo", u['pseudo']).execute()
         
-        # 2. Update visuel direct pour le joueur
+        # 2. Update visuel direct pour le joueur qui a cliqué
         emit('update_score', {'clicks': new_val, 'rank': get_rank_title(new_val)})
         
-        # 3. Synchronisation Temps Réel (Broadcast) toutes les 5 clics pour la fluidité
-        if new_val % 5 == 0:
+        # 3. Synchronisation Temps Réel (Broadcast)
+        # % 1 signifie que le classement s'actualise pour TOUT LE MONDE à chaque clic.
+        if new_val % 1 == 0:
             broadcast_leaderboard_to_all()
             
         # 4. Si en guilde, on ajoute au score de guilde
+        # BIEN ALIGNÉ ICI : cela doit être à l'intérieur du "if u:"
         if u.get('guild'):
-            supabase.rpc('increment_guild_clicks', {'guild_name': u['guild'], 'amount': u['mult']}).execute()
+            supabase.rpc('increment_guild_clicks', {
+                'guild_name': str(u['guild']), 
+                'amount': int(u['mult'])
+            }).execute()
 
 @socketio.on('buy_upgrade')
 def handle_upgrade():
