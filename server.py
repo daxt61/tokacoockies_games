@@ -27,15 +27,17 @@ socketio = SocketIO(app,
                     ping_interval=5)
 
 # --- CONFIGURATION SUPABASE ---
-# --- CONFIGURATION SUPABASE ---
+from supabase import create_client, Client
+from supabase.lib.client_options import ClientOptions
+
 SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
-# Utilise ta clé service_role (celle qui commence par eyJ...)
+# Assure-toi que c'est bien ta clé SERVICE_ROLE (celle qui commence par eyJ...)
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6emhrZHpqbmplZW9xYnRsbGVzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODMxMTIwOCwiZXhwIjoyMDgzODg3MjA4fQ.0TRrVyMKV3EHXmw3HZKC86CQSo1ezMkISMbccLoyXrA" 
 
 try:
-    # Correction de l'erreur 'proxy' : on initialise sans arguments superflus
-    from supabase import Client, create_client
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    # On initialise avec des options vides pour éviter l'erreur 'proxy'
+    options = ClientOptions()
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY, options=options)
     print("✅ [SYSTEM] Base de données connectée avec succès.")
 except Exception as e:
     print(f"❌ [SYSTEM] Erreur de connexion DB : {e}")
