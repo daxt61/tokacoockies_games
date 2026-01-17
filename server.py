@@ -12,7 +12,7 @@ import os
 import logging
 import time
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from flask import Flask, render_template, request, session, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -1066,25 +1066,30 @@ def get_leaderboard():
 # ============================================================================
 
 @socketio.on('disconnect')
-def handle_disconnect():
+def handle_disconnect(*args): # Ajoute *args pour accepter les arguments envoyés par SocketIO
     if request.sid in connected_users:
         user = connected_users.pop(request.sid)
         logger.info(f"User {user.get('pseudo')} disconnected")
+        
         if user.get('pseudo'):
-            leave_room(user['pseudo'])
-            # Update last online
             try:
+                leave_room(user['pseudo'])
+                # Correction ici : on utilise timezone.utc pour éviter le conflit avec Supabase
                 supabase.table("users").update({
-                    "last_online": datetime.now().isoformat()
+                    "last_online": datetime.now(timezone.utc).isoformat()
                 }).eq("pseudo", user['pseudo']).execute()
-            except:
+            except Exception as e:
+                logger.error(f"Error updating last_online: {e}")
                 pass
 
 @socketio.on_error_default
 def default_error_handler(e):
     logger.error(f"Socket error: {e}")
-    emit('error', 'An error occurred')
-
+    # On évite d'émettre une erreur si le client est déjà déconnecté
+    try:
+        emit('error', 'An error occurred')
+    except:
+        pass
 # ============================================================================
 # MAIN
 # ============================================================================
