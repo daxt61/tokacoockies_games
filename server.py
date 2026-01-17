@@ -28,7 +28,7 @@ def get_rank_title(clicks):
     return "Vagabond"
 
 def broadcast_leaderboard_to_all():
-    """Sync le classement pour tous les joueurs en ligne"""
+    """Mise à jour globale du classement pour tous les joueurs"""
     for sid, data in connected_users.items():
         try:
             res = supabase.rpc('get_relative_leaderboard', {'player_pseudo': data['pseudo']}).execute()
@@ -39,17 +39,15 @@ def update_social_data(pseudo):
     """Logique sociale corrigée : Filtre les amis et les demandes séparément"""
     try:
         # 1. Amis RÉELS (status = accepted)
-        # On cherche où l'utilisateur est soit l'envoyeur (user1) soit le receveur (user2)
         res_f = supabase.table("friendships").select("*").or_(f'user1.eq."{pseudo}",user2.eq."{pseudo}"').eq("status", "accepted").execute()
         
         friends_list = []
         for f in res_f.data:
-            # On récupère le nom de l'autre personne
             friend_name = f['user2'] if f['user1'] == pseudo else f['user1']
             if friend_name not in friends_list:
                 friends_list.append(friend_name)
         
-        # 2. Demandes en ATTENTE (status = pending ET on est le receveur user2)
+        # 2. Demandes en ATTENTE
         res_r = supabase.table("friendships").select("user1").eq("user2", pseudo).eq("status", "pending").execute()
         pending_requests = [r['user1'] for r in res_r.data]
         
@@ -63,7 +61,6 @@ def update_social_data(pseudo):
             res_jr = supabase.table("guild_join_requests").select("requester").eq("guild_name", g_name).execute()
             guild_reqs = [r['requester'] for r in res_jr.data]
 
-        # Envoi des données propres au joueur
         socketio.emit('social_update', {
             'friends': friends_list,
             'friend_requests': pending_requests,
@@ -117,12 +114,15 @@ def handle_click():
         res = supabase.table("users").select("clicks").eq("pseudo", u['pseudo']).execute()
         nv = res.data[0]['clicks'] + u['mult']
         supabase.table("users").update({"clicks": nv}).eq("pseudo", u['pseudo']).execute()
+        
+        # Envoi immédiat du score pour l'illusion visuelle
         emit('update_score', {'clicks': nv, 'rank': get_rank_title(nv)})
         
-        # Broadcast classement
-        if nv % 5 == 0: broadcast_leaderboard_to_all()
+        # Broadcast classement REDUIT (toutes les 20 clics au lieu de 5)
+        if nv % 20 == 0: 
+            broadcast_leaderboard_to_all()
         
-        # Score de guilde (Correction PGRST203 intégrée)
+        # Score de guilde
         if u.get('guild'):
             try:
                 supabase.rpc('increment_guild_clicks', {
@@ -139,22 +139,16 @@ def handle_chat(data):
             'user': u['pseudo'], 'text': data['msg'][:150], 'guild': u['guild']
         }, broadcast=True)
 
-# --- LOGIQUE SOCIALE CORRIGÉE ---
-
 @socketio.on('send_friend_request')
 def handle_f_req(data):
     u = connected_users.get(request.sid)
     target = data['target'].strip()
     if not u or target == u['pseudo']: return
-
-    # Vérification anti-doublon (A->B ou B->A existe déjà ?)
     check = supabase.table("friendships").select("*").or_(
         f'and(user1.eq."{u["pseudo"]}",user2.eq."{target}"),and(user1.eq."{target}",user2.eq."{u["pseudo"]}")'
     ).execute()
-
     if check.data:
         return emit('error', "Déjà amis ou demande en attente")
-
     try:
         supabase.table("friendships").insert({
             "user1": u['pseudo'], "user2": target, "status": "pending"
@@ -169,27 +163,19 @@ def handle_f_req(data):
 def handle_f_resp(data):
     u = connected_users.get(request.sid)
     target = data['target']
-    
     if data['action'] == 'accept':
-        # On valide la ligne où on est user2 (receveur)
         supabase.table("friendships").update({"status": "accepted"}).match({
             "user1": target, "user2": u['pseudo']
         }).execute()
         emit('success', f"Tu es ami avec {target}")
     else:
-        # On décline/supprime
         supabase.table("friendships").delete().match({
             "user1": target, "user2": u['pseudo']
         }).execute()
-
-    # Refresh pour les deux
     update_social_data(u['pseudo'])
     update_social_data(target)
-    # Sync de la liste d'amis en mémoire pour le chat
     if request.sid in connected_users:
         connected_users[request.sid]['friends'] = update_social_data(u['pseudo'])
-
-# --- GUILDES (Inchangé) ---
 
 @socketio.on('create_guild')
 def handle_create_g(data):
