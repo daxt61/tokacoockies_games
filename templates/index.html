@@ -261,7 +261,35 @@
         function buyUpgrade(t){socket.emit('buy_upgrade',{type:t});playSfx(600,.1)}
         function prestige(){if(myData.clicks<1e5)return toast('Need 100,000 clicks!','error');if(confirm('Reset everything for prestige?'))socket.emit('prestige')}
         socket.on('prestige_complete',d=>{toast(`Prestige level ${d.new_level}! +${d.points_gained} points! 🌟`,'success');updateUI({clicks:0,mult:1,auto:0,prestige:d.new_level})});
-        socket.on('leaderboard_update',d=>{const medals=['gold','silver','bronze'];document.getElementById('lb-content').innerHTML=d.players.map((p,i)=>{const r=p.rank||i+1,m=medals[r-1]||'',self=p.pseudo===myData.pseudo;return`<div class="lb-item${self?' me':''}"><div class="flex"><div class="lb-rank ${m}">${r}</div><div class="lb-player"><div class="lb-name">${p.pseudo}</div><div class="lb-guild">${p.guild_name||'No guild'}</div></div></div><div class="lb-score">${(p.clicks||0).toLocaleString()}</div></div>`}).join('')||'<div class="empty-state">No players</div>'});
+        socket.on('leaderboard_update', d => {
+    const medals = ['gold', 'silver', 'bronze'];
+    const lbContainer = document.getElementById('lb-content');
+    if (!lbContainer) return;
+
+    lbContainer.innerHTML = d.players.map((p, i) => {
+        // 1. On utilise le rang réel venant de la base de données
+        const r = p.rank || (i + 1); 
+        const m = medals[r - 1] || '';
+        
+        // 2. On vérifie si c'est toi (via le marqueur is_player du serveur)
+        const isMe = p.is_player || (p.pseudo === myData.pseudo);
+
+        return `
+            <div class="lb-item ${isMe ? 'me' : ''}">
+                <div class="flex">
+                    <div class="lb-rank ${m}">${r}</div>
+                    <div class="lb-player">
+                        <div class="lb-name">
+                            ${p.pseudo}
+                            ${p.prestige_level > 0 ? `<span style="color:#a855f7; font-size:0.8em;">[★${p.prestige_level}]</span>` : ''}
+                        </div>
+                        <div class="lb-guild">${p.guild_name || 'No guild'}</div>
+                    </div>
+                </div>
+                <div class="lb-score">${Math.floor(p.clicks || 0).toLocaleString()}</div>
+            </div>`;
+    }).join('') || '<div class="empty-state">No players found</div>';
+});
         function updateGuildUI(){const h=myData.guild!==null;document.getElementById('no-guild-state').style.display=h?'none':'block';document.getElementById('has-guild-state').style.display=h?'block':'none'}
         function createGuild(){const n=document.getElementById('guild-name-input').value.trim(),d=document.getElementById('guild-desc-input').value.trim();if(!n)return toast('Enter guild name!','error');socket.emit('create_guild',{name:n,description:d})}
         function leaveGuild(){if(confirm('Really leave?'))socket.emit('leave_guild')}
