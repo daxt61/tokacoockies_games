@@ -1,3 +1,4 @@
+{% raw %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -242,8 +243,6 @@
         <div class="nav-item" onclick="switchView('social',this)"><span class="nav-icon">👥</span><div>Social</div></div>
         <div class="nav-item" onclick="switchView('requests',this)"><span class="nav-icon">📬</span><div>Requests</div><span class="notif-badge" id="notif-badge" style="display:none"></span></div>
     </nav>
-
-    {% raw %}
     <script>
         const socket=io();let myData={pseudo:'',clicks:0,mult:1,auto:0,rank:{title:'Novice'},guild:null,prestige:0,daily_available:!1,gems:0},audioCtx=null;
         function createParticles(){const c=document.getElementById('particles');for(let i=0;i<50;i++){const p=document.createElement('div');p.className='particle';p.style.left=Math.random()*100+'%';p.style.animationDuration=Math.random()*10+5+'s';p.style.animationDelay=Math.random()*5+'s';c.appendChild(p)}}
@@ -290,7 +289,6 @@
         function getGameConfig(){socket.emit('get_achievements');socket.emit('get_shop_items')}
         setTimeout(getGameConfig,1e3);
     </script>
-    {% endraw %}
-
 </body>
 </html>
+{% endraw %}
