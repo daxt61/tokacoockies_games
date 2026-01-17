@@ -21,15 +21,18 @@ socketio = SocketIO(app,
                     async_mode='eventlet', 
                     ping_timeout=60, 
                     ping_interval=25)
-
 # --- SUPABASE ---
+from supabase.lib.client_options import ClientOptions # <--- Ajoute cet import en haut avec les autres
+
 SUPABASE_URL = "https://rzzhkdzjnjeeoqbtlles.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6emhrZHpqbmplZW9xYnRsbGVzIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODMxMTIwOCwiZXhwIjoyMDgzODg3MjA4fQ.0TRrVyMKV3EHXmw3HZKC86CQSo1ezMkISMbccLoyXrA"
 
 supabase = None
 try:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ [SYSTEM] Base de données connectée")
+    # On force les options à vide pour garantir la compatibilité Render
+    options = ClientOptions()
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY, options=options)
+    print("✅ [SYSTEM] Base de données connectée avec succès")
 except Exception as e:
     print(f"❌ [SYSTEM] Erreur DB: {e}")
 
