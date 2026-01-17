@@ -5,17 +5,23 @@ Production-ready Flask + Socket.IO backend with all features
 ============================================================================
 """
 
+import eventlet
+eventlet.monkey_patch()  # DOIT être la toute première instruction du fichier
+
 import os
 import logging
 import time
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, session, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_bcrypt import Bcrypt
 from supabase import create_client, Client
-import eventlet
+
+# Configurer les logs pour voir ce qui se passe sur Render
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # APP INITIALIZATION
@@ -23,15 +29,18 @@ import eventlet
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+
 bcrypt = Bcrypt(app)
+
+# Initialisation de SocketIO avec les paramètres optimisés pour Render
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
     async_mode='eventlet',
     ping_timeout=60,
     ping_interval=25,
-    logger=False,
-    engineio_logger=False
+    logger=True,          # Mis à True temporairement pour débugger
+    engineio_logger=True  # Mis à True temporairement pour débugger
 )
 
 logging.basicConfig(
