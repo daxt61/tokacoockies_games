@@ -44,11 +44,12 @@
 
     <div id="auth-overlay">
         <div class="card" style="width: 300px; text-align: center;">
-            <h1 style="color:var(--accent); margin-bottom: 20px;">TOKA Empire</h1>
-            <input id="pseudo" placeholder="Pseudo">
+            <h1 style="color:var(--accent); margin-bottom: 20px;">🍪 TOKA Empire</h1>
+            <input id="pseudo" placeholder="Pseudo (3 caractères min)">
             <input id="pass" type="password" placeholder="Mot de passe">
             <button class="btn" onclick="auth('login')">SE CONNECTER</button>
             <button class="btn" style="background:none; color:white; margin-top:10px;" onclick="auth('register')">Créer un compte</button>
+            <p id="status" style="margin-top:10px; font-size:0.8rem; color:#888;">Connexion au serveur...</p>
         </div>
     </div>
 
@@ -65,13 +66,13 @@
             <div class="card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div style="text-align:center">
                     <b title="Multiplie vos clics manuels">Clic: x<span id="mult-text">1</span></b><br>
-                    <small>Prix: <span id="cost-text" style="color:var(--red)">100</span></small>
-                    <button class="btn" style="margin-top:5px" onclick="socket.emit('buy_upgrade', {type:'mult'})">BOOST</button>
+                    <small>Prix: <span id="cost-text" style="color:var(--red)">200</span></small>
+                    <button class="btn" style="margin-top:5px" onclick="buyUpgrade('mult')">BOOST</button>
                 </div>
                 <div style="text-align:center; border-left: 1px solid #333">
                     <b title="Production automatique par seconde">Auto: <span id="auto-text">0</span>/s</b><br>
-                    <small>Prix: <span id="auto-cost-text" style="color:var(--red)">500</span></small>
-                    <button class="btn" style="margin-top:5px; background:var(--green)" onclick="socket.emit('buy_upgrade', {type:'auto'})">CPS+</button>
+                    <small>Prix: <span id="auto-cost-text" style="color:var(--red)">750</span></small>
+                    <button class="btn" style="margin-top:5px; background:var(--green)" onclick="buyUpgrade('auto')">CPS+</button>
                 </div>
             </div>
 
@@ -87,135 +88,139 @@
                 <div id="chat-box"></div>
                 <div style="display:flex; gap:5px; margin-top:10px;">
                     <input id="chat-input" placeholder="Message..." onkeypress="if(event.key==='Enter') sendChat()">
-                    <button class="btn" style="width:80px" onclick="sendChat()">SND</button>
+                    <button class="btn" style="width:80px" onclick="sendChat()">SEND</button>
                 </div>
             </div>
-        </div>
-
-        <div id="view-guild" class="view">
-            <h2>🛡️ Guilde</h2>
-            <div id="guild-creation" class="card">
-                <p>Créez votre empire ou rejoignez-en un.</p>
-                <input id="g-name" placeholder="Nom de la guilde">
-                <button class="btn" onclick="createGuild()">CRÉER (Gratuit)</button>
-            </div>
-            
-            <div id="guild-active" class="card" style="display:none;">
-                <p>Gestion de la guilde</p>
-                <div id="guild-reqs" style="margin-bottom:10px;"></div>
-                <button class="btn" style="background:var(--red)" onclick="socket.emit('leave_guild')">QUITTER LA GUILDE</button>
-            </div>
-
-            <div class="card">
-                <h3>Toutes les guildes</h3>
-                <div id="guild-list"></div>
-            </div>
-        </div>
-
-        <div id="view-social" class="view">
-            <h2>👥 Amis</h2>
-            <div class="card">
-                <input id="f-pseudo" placeholder="Pseudo de l'ami...">
-                <button class="btn" onclick="sendFriendRequest()">AJOUTER</button>
-            </div>
-            <div id="social-reqs" class="card"><h4>Demandes en attente</h4><div id="req-list">Aucune</div></div>
-            <div id="social-list" class="card"><h4>Mes Amis</h4><div id="friend-list">Aucun</div></div>
         </div>
     </main>
 
     <nav>
         <div class="nav-item active" onclick="tab('game', this)">🕹️<br>JEU</div>
         <div class="nav-item" onclick="tab('chat', this)">💬<br>CHAT</div>
-        <div class="nav-item" onclick="tab('guild', this); socket.emit('get_guilds')">🛡️<br>GUILDE</div>
-        <div class="nav-item" onclick="tab('social', this)">👥<br>AMIS<div class="dot" id="social-dot"></div></div>
     </nav>
 
     <script>
+        console.log("🚀 Initialisation du client...");
         const socket = io();
         let myName = "";
+        let isConnected = false;
 
-        // Audio SFX (optionnel, à ajouter dans ton dossier static si tu veux)
-        const sfxClick = new Audio(); 
-        const sfxNotif = new Audio();
+        // --- GESTION CONNEXION SOCKET ---
+        socket.on('connect', () => {
+            console.log("✅ Socket connecté !");
+            isConnected = true;
+            document.getElementById('status').innerText = "✅ Serveur connecté";
+            document.getElementById('status').style.color = "var(--green)";
+        });
 
-        function doClick() { socket.emit('add_click'); }
+        socket.on('disconnect', () => {
+            console.log("❌ Socket déconnecté");
+            isConnected = false;
+            document.getElementById('status').innerText = "❌ Déconnecté du serveur";
+            document.getElementById('status').style.color = "var(--red)";
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error("❌ Erreur de connexion:", err);
+            document.getElementById('status').innerText = "❌ Erreur de connexion";
+            document.getElementById('status').style.color = "var(--red)";
+        });
+
+        // --- FONCTIONS PRINCIPALES ---
+        
+        function doClick() { 
+            if (!isConnected) return toast("Pas connecté au serveur", "var(--red)");
+            console.log("🖱️ Clic envoyé");
+            socket.emit('add_click'); 
+        }
         
         function auth(type) {
-            const p = document.getElementById('pseudo').value;
+            const p = document.getElementById('pseudo').value.trim();
             const pw = document.getElementById('pass').value;
-            if(!p || !pw) return toast("Remplis tout !", "var(--red)");
+            
+            console.log(`🔐 Tentative de ${type} pour "${p}"`);
+            
+            if(!p || p.length < 3) {
+                toast("Pseudo trop court (min 3 caractères)", "var(--red)");
+                return;
+            }
+            if(!pw || pw.length < 3) {
+                toast("Mot de passe trop court", "var(--red)");
+                return;
+            }
+            
+            if (!isConnected) {
+                toast("Connexion au serveur en cours...", "var(--red)");
+                return;
+            }
+            
+            console.log("📤 Envoi de login_action:", {pseudo: p, type: type});
             socket.emit('login_action', {pseudo: p, password: pw, type: type});
         }
 
         function sendChat() {
             const i = document.getElementById('chat-input');
             if(i.value.trim()) {
+                console.log("💬 Envoi du message:", i.value);
                 socket.emit('send_chat', {msg: i.value});
                 i.value = "";
             }
         }
 
+        function buyUpgrade(type) {
+            console.log("🛒 Achat:", type);
+            socket.emit('buy_upgrade', {type: type});
+        }
+
         // --- ECOUTEURS SOCKET ---
 
         socket.on('login_ok', d => {
+            console.log("✅ Connexion réussie:", d);
             myName = d.pseudo;
             document.getElementById('auth-overlay').style.display = 'none';
             updateUI(d);
+            toast("Bienvenue " + d.pseudo + " !", "var(--green)");
         });
 
-        socket.on('update_score', d => updateUI(d));
-        socket.on('update_full_state', d => updateUI(d));
+        socket.on('update_score', d => {
+            console.log("📊 Score mis à jour:", d);
+            updateUI(d);
+        });
+        
+        socket.on('update_full_state', d => {
+            console.log("🔄 État complet mis à jour:", d);
+            updateUI(d);
+        });
 
         socket.on('new_chat', d => {
+            console.log("💬 Nouveau message:", d);
             const b = document.getElementById('chat-box');
             const m = document.createElement('div');
             m.className = "msg";
-            const gTag = d.guild ? `<span class="g-tag">[${d.guild}]</span>` : "";
-            m.innerHTML = `${gTag}<b>${d.user}:</b> ${d.text}`;
+            m.innerHTML = `<small style="color:#666">${d.time}</small> <b>${d.user}:</b> ${d.text}`;
             b.appendChild(m);
             b.scrollTop = b.scrollHeight;
         });
 
         socket.on('leaderboard_update', d => {
+            console.log("🏆 Classement mis à jour:", d);
             document.getElementById('leaderboard-list').innerHTML = d.players.map(p => `
                 <div class="lb-item ${p.pseudo === myName ? 'me' : ''}">
                     <span>#${p.rank} ${p.pseudo}</span>
                     <b>${Math.floor(p.clicks).toLocaleString()}</b>
                 </div>
-            `).join('');
+            `).join('') || '<p style="text-align:center; color:#666">Aucun joueur</p>';
         });
 
-        socket.on('social_update', d => {
-            // Amis
-            document.getElementById('friend-list').innerHTML = d.friends.map(f => `
-                <div class="lb-item"><span>${f}</span> <span style="color:var(--green)">● Online</span></div>
-            `).join('') || "Aucun ami";
-            
-            // Demandes
-            const reqs = d.friend_requests.map(r => `
-                <div class="lb-item">
-                    <span>${r}</span>
-                    <div>
-                        <button class="btn" style="width:40px; padding:5px; background:var(--green)" onclick="respondFriend('${r}','accept')">✓</button>
-                        <button class="btn" style="width:40px; padding:5px; background:var(--red)" onclick="respondFriend('${r}','decline')">✕</button>
-                    </div>
-                </div>
-            `).join('');
-            document.getElementById('req-list').innerHTML = reqs || "Aucune demande";
-            if(d.friend_requests.length > 0) document.getElementById('social-dot').style.display = 'block';
+        socket.on('success', m => {
+            console.log("✅ Succès:", m);
+            toast(m, 'var(--green)');
         });
-
-        socket.on('guild_list', d => {
-            document.getElementById('guild-list').innerHTML = d.guilds.map(g => `
-                <div class="lb-item">
-                    <span>${g.name} <small>(${g.total_clicks || 0})</small></span>
-                    <button class="btn" style="width:80px; padding:5px;" onclick="socket.emit('ask_join_guild', {name:'${g.name}'})">Rejoindre</button>
-                </div>
-            `).join('') || "Aucune guilde créée";
+        
+        socket.on('error', m => {
+            console.error("❌ Erreur:", m);
+            toast(m, 'var(--red)');
         });
-
-        socket.on('success', m => toast(m, 'var(--green)'));
-        socket.on('error', m => toast(m, 'var(--red)'));
 
         // --- FONCTIONS UI ---
 
@@ -226,18 +231,12 @@
             
             if(d.mult !== undefined) {
                 document.getElementById('mult-text').innerText = d.mult;
-                document.getElementById('cost-text').innerText = (d.mult * 100).toLocaleString();
+                document.getElementById('cost-text').innerText = (d.mult * 200).toLocaleString();
             }
             
             if(d.auto !== undefined) {
                 document.getElementById('auto-text').innerText = d.auto;
-                document.getElementById('auto-cost-text').innerText = ((d.auto + 1) * 500).toLocaleString();
-            }
-
-            if(d.guild !== undefined) {
-                document.getElementById('my-guild').innerText = d.guild ? `[${d.guild}]` : "[SOLO]";
-                document.getElementById('guild-active').style.display = d.guild ? 'block' : 'none';
-                document.getElementById('guild-creation').style.display = d.guild ? 'none' : 'block';
+                document.getElementById('auto-cost-text').innerText = ((d.auto + 1) * 750).toLocaleString();
             }
         }
 
@@ -246,28 +245,18 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('view-' + id).classList.add('active');
             el.classList.add('active');
-            if(id === 'social') document.getElementById('social-dot').style.display = 'none';
         }
 
         function toast(m, c) {
+            console.log("🔔 Toast:", m);
             const t = document.getElementById('toast');
-            t.innerText = m; t.style.background = c; t.style.display = 'block';
+            t.innerText = m; 
+            t.style.background = c; 
+            t.style.display = 'block';
             setTimeout(() => t.style.display='none', 3000);
         }
 
-        function createGuild() {
-            const n = document.getElementById('g-name').value;
-            if(n) socket.emit('create_guild', {name: n});
-        }
-
-        function sendFriendRequest() {
-            const t = document.getElementById('f-pseudo').value;
-            if(t) { socket.emit('send_friend_request', {target: t}); document.getElementById('f-pseudo').value = ""; }
-        }
-
-        function respondFriend(target, action) {
-            socket.emit('respond_friend_request', {target, action});
-        }
+        console.log("✅ Script chargé avec succès");
     </script>
 </body>
 </html>
