@@ -203,17 +203,21 @@ def check_achievements(pseudo, clicks=0, friends_count=0, mult=1, prestige=0, st
         return []
 
 def send_leaderboard(sid=None):
-    """Send leaderboard to client(s)"""
     try:
-        if sid:
-            u = connected_users.get(sid)
-            if u:
-                res = supabase.rpc('get_relative_leaderboard', {'p_player_pseudo': u['pseudo']}).execute()
-                if res.data:
-                    socketio.emit('leaderboard_update', {'players': res.data}, room=sid)
+        if sid and sid in connected_users:
+            pseudo = connected_users[sid]['pseudo']
+            # Appel de la nouvelle fonction RPC
+            res = supabase.rpc('get_relative_leaderboard', {'p_player_pseudo': pseudo}).execute()
+            
+            if not res.data:
+                # Backup si le joueur n'a pas encore de score
+                res = supabase.table("users").select("pseudo, clicks, guild_name, prestige_level").order("clicks", desc=True).limit(10).execute()
+            
+            socketio.emit('leaderboard_update', {'players': res.data, 'type': 'relative'}, room=sid)
         else:
+            # Top 10 classique pour le broadcast global
             res = supabase.table("users").select("pseudo, clicks, guild_name, prestige_level").order("clicks", desc=True).limit(10).execute()
-            socketio.emit('leaderboard_update', {'players': res.data})
+            socketio.emit('leaderboard_update', {'players': res.data, 'type': 'global'})
     except Exception as e:
         logger.error(f"Leaderboard error: {e}")
 
