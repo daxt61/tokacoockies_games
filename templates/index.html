@@ -2,203 +2,115 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Tokacookies Empire - Social Update</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TokaCookies Empire</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        :root { --accent: #00d2ff; --bg: #0d1117; --panel: #161b22; --border: #30363d; --gold: #ffd700; --red: #ff4d4d; --green: #2ecc71; }
-        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        .card { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 10px; width: 100%; box-sizing: border-box; }
-        input { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid var(--border); background: #000; color: white; box-sizing: border-box; }
-        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; background: var(--accent); color: #000; transition: 0.2s; }
-        .btn:active { transform: scale(0.98); }
-        
-        #auth-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 2000; display: flex; align-items: center; justify-content: center; }
-        main { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; align-items: center; }
-        .view { display: none; width: 100%; max-width: 500px; animation: fadeIn 0.3s; }
+        :root { --accent: #00d2ff; --bg: #0d1117; --panel: #161b22; --border: #30363d; --green: #2ecc71; }
+        body { background: var(--bg); color: white; font-family: sans-serif; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+        .card { background: var(--panel); padding: 15px; border-radius: 12px; border: 1px solid var(--border); margin: 10px; }
+        .btn { width: 100%; padding: 12px; border-radius: 8px; border: none; cursor: pointer; background: var(--accent); font-weight: bold; color: #000; }
+        input { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 5px; border: 1px solid var(--border); background: #000; color: #fff; box-sizing: border-box;}
+        #cookie-btn { width: 150px; height: 150px; border-radius: 50%; background: #222; border: 5px solid var(--accent); font-size: 60px; display: flex; align-items: center; justify-content: center; margin: 20px auto; cursor: pointer; user-select: none; }
+        .view { display: none; padding: 10px; flex: 1; overflow-y: auto; }
         .view.active { display: block; }
-        
-        #cookie-btn { width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle, #1c2128, #000); border: 4px solid var(--accent); font-size: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; user-select: none; margin: 20px auto; transition: 0.1s; box-shadow: 0 0 20px rgba(0,210,255,0.2); }
-        #cookie-btn:active { transform: scale(0.92); }
-        
-        #chat-box { height: 200px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 10px; background: #000; border-radius: 8px; border: 1px solid var(--border); }
-        .msg { font-size: 0.9rem; padding: 5px 10px; border-radius: 5px; background: #1c2128; }
-        .msg b { color: var(--accent); }
-
-        .item-list { list-style: none; padding: 0; margin: 0; }
-        .item-list li { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #222; align-items: center; }
-
-        nav { height: 70px; background: var(--panel); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); }
-        .nav-item { color: #888; font-size: 0.7rem; text-align: center; cursor: pointer; flex: 1; }
-        .nav-item.active { color: var(--accent); font-weight: bold; }
-
-        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 12px 25px; border-radius: 30px; display: none; z-index: 3000; font-weight: bold; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        nav { display: flex; background: var(--panel); border-top: 1px solid var(--border); height: 60px; }
+        .nav-item { flex: 1; text-align: center; padding: 10px; cursor: pointer; }
+        #toast { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: var(--green); color: #000; padding: 10px 20px; border-radius: 20px; display: none; z-index: 1000; }
     </style>
 </head>
 <body>
     <div id="toast"></div>
 
-    <div id="auth-overlay">
-        <div class="card" style="width: 300px; text-align: center;">
-            <h1 style="color:var(--accent);">🍪 TOKA Empire</h1>
+    <div id="auth-overlay" style="position:fixed; inset:0; background:var(--bg); z-index:100; display:flex; align-items:center; justify-content:center;">
+        <div class="card" style="width:300px;">
+            <h2 style="text-align:center; color:var(--accent);">🍪 TOKA EMPIRE</h2>
             <input id="pseudo" placeholder="Pseudo">
             <input id="pass" type="password" placeholder="Mot de passe">
             <button class="btn" onclick="auth('login')">CONNEXION</button>
-            <button class="btn" style="background:none; color:white; margin-top:5px;" onclick="auth('register')">S'inscrire</button>
-            <p id="status" style="margin-top:10px; font-size:0.8rem; color:#888;">Initialisation...</p>
+            <button onclick="auth('register')" style="background:none; border:none; color:#888; width:100%; margin-top:10px; cursor:pointer;">Créer un compte</button>
         </div>
     </div>
 
-    <header style="padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel);">
-        <div><b id="my-name">...</b> <small id="my-rank"></small></div>
-        <div id="my-guild-tag" style="color:var(--gold);">[SOLO]</div>
+    <header style="padding:15px; background:var(--panel); border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
+        <b id="my-name">Chargement...</b>
+        <span id="my-guild" style="color:var(--accent);">[SOLO]</span>
     </header>
 
-    <main>
-        <div id="view-game" class="view active">
-            <h1 id="score-text" style="font-size: 2.5rem; text-align: center; margin: 10px 0;">0</h1>
-            <div id="cookie-btn" onclick="socket.emit('add_click')">🍪</div>
-            
-            <div class="card" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div style="text-align:center">
-                    <b>Clic: x<span id="mult-text">1</span></b><br>
-                    <button class="btn" style="margin-top:5px" onclick="socket.emit('buy_upgrade', {type:'mult'})">BOOST</button>
-                </div>
-                <div style="text-align:center; border-left: 1px solid #333">
-                    <b>Auto: <span id="auto-text">0</span>/s</b><br>
-                    <button class="btn" style="margin-top:5px; background:var(--green)" onclick="socket.emit('buy_upgrade', {type:'auto'})">CPS+</button>
-                </div>
+    <div id="view-game" class="view active">
+        <h1 id="score-text" style="text-align:center; font-size:3.5rem; margin:20px 0;">0</h1>
+        <div id="cookie-btn" onclick="socket.emit('add_click')">🍪</div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="card" style="text-align:center;">
+                <b>Multi: x<span id="mult-text">1</span></b><br>
+                <button class="btn" style="margin-top:10px" onclick="socket.emit('buy_upgrade', {type:'mult'})">BOOST</button>
             </div>
-
-            <div class="card">
-                <h3 style="margin:0 0 10px 0;">🏆 Top 10</h3>
-                <div id="leaderboard-list"></div>
+            <div class="card" style="text-align:center;">
+                <b>Auto: <span id="auto-text">0</span>/s</b><br>
+                <button class="btn" style="margin-top:10px; background:var(--green)" onclick="socket.emit('buy_upgrade', {type:'auto'})">ACHETER</button>
             </div>
         </div>
+    </div>
 
-        <div id="view-social" class="view">
-            <h3>🛡️ Ma Guilde</h3>
-            <div class="card" id="guild-section">
-                <input id="guild-input" placeholder="Nom de la guilde...">
-                <button class="btn" onclick="createGuild()">CRÉER GUILDE</button>
-            </div>
-
-            <h3>👥 Amis</h3>
-            <div class="card">
-                <div style="display:flex; gap:5px;">
-                    <input id="friend-input" placeholder="Pseudo de l'ami...">
-                    <button class="btn" style="width:80px" onclick="addFriend()">ADD</button>
-                </div>
-                <ul id="friends-list" class="item-list" style="margin-top:10px;">
-                    <li style="color:#666; justify-content:center;">Aucun ami ajouté</li>
-                </ul>
+    <div id="view-social" class="view">
+        <div class="card">
+            <h3>👥 Ajouter un ami</h3>
+            <div style="display:flex; gap:5px;">
+                <input id="f-input" placeholder="Pseudo de l'ami" style="margin:0;">
+                <button class="btn" style="width:80px" onclick="addFriend()">ADD</button>
             </div>
         </div>
-
-        <div id="view-chat" class="view">
-            <h3>💬 Chat Global</h3>
-            <div class="card">
-                <div id="chat-box"></div>
-                <div style="display:flex; gap:5px; margin-top:10px;">
-                    <input id="chat-input" placeholder="Message...">
-                    <button class="btn" style="width:80px" onclick="sendChat()">OK</button>
-                </div>
-            </div>
+        <div class="card">
+            <h3>📜 Liste d'amis</h3>
+            <ul id="friends-list" style="list-style:none; padding:0;"></ul>
         </div>
-    </main>
+    </div>
+
+    <div id="view-chat" class="view">
+        <div class="card" id="chat-box" style="height:300px; overflow-y:auto; background:#000;"></div>
+        <div class="card" style="display:flex; gap:5px;">
+            <input id="chat-input" placeholder="Message..." style="margin:0;">
+            <button class="btn" style="width:80px" onclick="sendChat()">ENVOYER</button>
+        </div>
+    </div>
 
     <nav>
-        <div class="nav-item active" onclick="tab('game', this)">🕹️<br>JEU</div>
-        <div class="nav-item" onclick="tab('social', this)">👥<br>SOCIAL</div>
-        <div class="nav-item" onclick="tab('chat', this)">💬<br>CHAT</div>
+        <div class="nav-item" onclick="show('game')">🕹️<br>JEU</div>
+        <div class="nav-item" onclick="show('social')">👥<br>SOCIAL</div>
+        <div class="nav-item" onclick="show('chat')">💬<br>CHAT</div>
     </nav>
 
     <script>
         const socket = io();
-        let myName = "";
+        function auth(type) { socket.emit('login_action', {pseudo: document.getElementById('pseudo').value, password: document.getElementById('pass').value, type}); }
+        function show(id) { document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById('view-'+id).classList.add('active'); }
+        function addFriend() { socket.emit('add_friend', {pseudo: document.getElementById('f-input').value}); document.getElementById('f-input').value=""; }
+        function sendChat() { socket.emit('send_chat', {msg: document.getElementById('chat-input').value}); document.getElementById('chat-input').value=""; }
 
-        // --- AUTH ---
-        function auth(type) {
-            const pseudo = document.getElementById('pseudo').value;
-            const password = document.getElementById('pass').value;
-            socket.emit('login_action', {pseudo, password, type});
-        }
-
-        socket.on('login_ok', d => {
-            myName = d.pseudo;
-            document.getElementById('auth-overlay').style.display = 'none';
-            updateUI(d);
-            toast("Connecté !", "var(--green)");
-        });
-
-        // --- SOCIAL FUNCTIONS ---
-        function addFriend() {
-            const p = document.getElementById('friend-input').value;
-            if(p) {
-                socket.emit('add_friend', {pseudo: p});
-                document.getElementById('friend-input').value = "";
-            }
-        }
-
-        function createGuild() {
-            const n = document.getElementById('guild-input').value;
-            if(n) socket.emit('create_guild', {name: n});
-        }
-
-        function sendChat() {
-            const i = document.getElementById('chat-input');
-            if(i.value) { socket.emit('send_chat', {msg: i.value}); i.value = ""; }
-        }
-
-        // --- UPDATES ---
+        socket.on('login_ok', d => { document.getElementById('auth-overlay').style.display = 'none'; updateUI(d); });
         socket.on('update_score', d => updateUI(d));
         socket.on('update_full_state', d => updateUI(d));
+        
+        socket.on('update_friends', d => {
+            document.getElementById('friends-list').innerHTML = d.friends.map(f => `<li style="padding:10px; border-bottom:1px solid #333;">👤 ${f}</li>`).join('');
+        });
+
+        socket.on('new_chat', d => {
+            const b = document.getElementById('chat-box');
+            b.innerHTML += `<div><b>${d.user}:</b> ${d.text}</div>`;
+            b.scrollTop = b.scrollHeight;
+        });
 
         function updateUI(d) {
             if(d.pseudo) document.getElementById('my-name').innerText = d.pseudo;
             if(d.clicks !== undefined) document.getElementById('score-text').innerText = Math.floor(d.clicks).toLocaleString();
-            if(d.rank) document.getElementById('my-rank').innerText = d.rank;
-            if(d.mult) document.getElementById('mult-text').innerText = d.mult;
+            if(d.mult !== undefined) document.getElementById('mult-text').innerText = d.mult;
             if(d.auto !== undefined) document.getElementById('auto-text').innerText = d.auto;
-            
-            if(d.guild) {
-                document.getElementById('my-guild-tag').innerText = `[${d.guild.toUpperCase()}]`;
-                document.getElementById('guild-section').innerHTML = `<p style="text-align:center">Membre de : <b>${d.guild}</b></p>`;
-            }
+            if(d.guild) document.getElementById('my-guild').innerText = `[${d.guild}]`;
         }
 
-        socket.on('leaderboard_update', d => {
-            document.getElementById('leaderboard-list').innerHTML = d.players.map(p => `
-                <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #222;">
-                    <span>${p.pseudo}</span><b>${Math.floor(p.clicks).toLocaleString()}</b>
-                </div>
-            `).join('');
-        });
-
-        socket.on('new_chat', d => {
-            const box = document.getElementById('chat-box');
-            box.innerHTML += `<div class="msg"><b>${d.user}:</b> ${d.text}</div>`;
-            box.scrollTop = box.scrollHeight;
-        });
-
-        // --- UI UTILS ---
-        function tab(id, el) {
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.getElementById('view-' + id).classList.add('active');
-            el.classList.add('active');
-        }
-
-        function toast(m, c) {
-            const t = document.getElementById('toast');
-            t.innerText = m; t.style.background = c; t.style.display = 'block';
-            setTimeout(() => t.style.display='none', 3000);
-        }
-
-        socket.on('success', m => toast(m, "var(--green)"));
-        socket.on('error', m => toast(m, "var(--red)"));
-        socket.on('connect', () => document.getElementById('status').innerText = "Serveur en ligne");
+        socket.on('success', m => { const t = document.getElementById('toast'); t.innerText = m; t.style.display = 'block'; setTimeout(()=>t.style.display='none', 2000); });
+        socket.on('error', m => alert(m));
     </script>
 </body>
 </html>
