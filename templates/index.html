@@ -255,7 +255,25 @@
         socket.on('success',m=>toast(m,'success'));
         socket.on('notif',m=>toast(m,'info'));
         function updateUI(d){if(d.pseudo){myData.pseudo=d.pseudo;document.getElementById('my-pseudo').innerText=d.pseudo;document.getElementById('my-avatar').innerText=d.pseudo.charAt(0).toUpperCase()}if(d.clicks!==undefined){myData.clicks=d.clicks;document.getElementById('score-display').innerText=d.clicks.toLocaleString()}if(d.mult){myData.mult=d.mult;document.getElementById('mult-val').innerText=d.mult;document.getElementById('mult-cost').innerText=(d.mult*100).toLocaleString()}if(d.auto!==undefined){myData.auto=d.auto;document.getElementById('auto-val').innerText=d.auto;document.getElementById('auto-cost').innerText=((d.auto+1)*1000).toLocaleString()}if(d.rank){myData.rank=d.rank;document.getElementById('rank-badge').innerText=d.rank.title;document.getElementById('rank-badge').style.background=d.rank.color||'var(--primary)'}if(d.guild!==undefined){myData.guild=d.guild;document.getElementById('guild-badge').innerText=d.guild?`[${d.guild.toUpperCase()}]`:'[SOLO]';updateGuildUI()}if(d.prestige!==undefined){myData.prestige=d.prestige;document.getElementById('prestige-val').innerText=d.prestige;document.getElementById('prestige-btn').innerText=myData.clicks>=1e5?'✨ PRESTIGE NOW!':'✨ PRESTIGE (100K)'}if(d.daily_available!==undefined){myData.daily_available=d.daily_available;const btn=document.getElementById('daily-btn');btn.disabled=!d.daily_available;btn.innerText=d.daily_available?'🎁 CLAIM':'🎁 CLAIMED'}if(d.gems!==undefined)myData.gems=d.gems}
-        function clickAction(){playSfx(440,.05);socket.emit('add_click')}
+        function clickAction() {
+    // 1. Son et envoi au serveur
+    playSfx(440, .05);
+    socket.emit('add_click');
+
+    // 2. ILLUSION : Mise à jour immédiate du score local sans attendre le serveur
+    myData.clicks += myData.mult; // On ajoute le multiplicateur actuel
+    
+    // Mise à jour du compteur principal
+    const scoreDisplay = document.getElementById('score-display');
+    if (scoreDisplay) scoreDisplay.innerText = Math.floor(myData.clicks).toLocaleString();
+
+    // 3. ILLUSION : Mise à jour immédiate de MON score dans le leaderboard
+    // On cherche notre ligne dans le tableau
+    const myRowScore = document.querySelector('.lb-item.me .lb-score');
+    if (myRowScore) {
+        myRowScore.innerText = Math.floor(myData.clicks).toLocaleString();
+    }
+}
         socket.on('update_score',d=>updateUI(d));
         socket.on('update_full_state',d=>updateUI(d));
         function buyUpgrade(t){socket.emit('buy_upgrade',{type:t});playSfx(600,.1)}
